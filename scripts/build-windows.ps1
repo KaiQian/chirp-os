@@ -12,5 +12,5 @@ try {
     Copy-Item platforms/windows/Verify-Windows.cmd "$Output/Verify-Windows.cmd"
     Copy-Item platforms/windows/README.md "$Output/README.md"
     New-Item -ItemType Directory -Force dist/releases | Out-Null
-    Copy-Item "$Output/ChirpOS.exe" "dist/releases/ChirpOS-0.3.1-$Runtime.exe" -Force
+    Copy-Item "$Output/ChirpOS.exe" "dist/releases/ChirpOS-0.3.2-$Runtime.exe" -Force
 } finally { Pop-Location }

@@ -1,6 +1,6 @@
 # 啾啾 ChirpOS · Windows
 
-[下载 / Download](https://github.com/billtt/chirp-os/releases/tag/v0.3.1) · [项目介绍 / About ChirpOS](../../README.md) · [开发指南 / Development](../../docs/DEVELOPMENT.md)
+[下载 / Download](https://github.com/billtt/chirp-os/releases/tag/v0.3.2) · [项目介绍 / About ChirpOS](../../README.md) · [开发指南 / Development](../../docs/DEVELOPMENT.md)
 
 ## 中文
 

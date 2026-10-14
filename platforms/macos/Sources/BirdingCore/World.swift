@@ -38,6 +38,29 @@ public enum Geometry {
             !$0.rect.intersection(area).isEmpty && !$0.rect.intersection(area).isNull
         }
     }
+    // Continuous foot-position intervals, clipped by screens, occluders and reservations.
+    public static func landingRanges(on host: Surface, surfaces: [Surface], screen: CGRect,
+                                     scale: CGFloat, occupied: [CGRect] = []) -> [ClosedRange<CGFloat>] {
+        guard let depth = surfaces.firstIndex(where: { $0.id == host.id }) else { return [] }
+        let y = host.rect.minY, half = 29 * scale
+        guard y - 39 * scale >= screen.minY, y + 9 * scale <= screen.maxY else { return [] }
+        let lo = max(perchX(0, rect: host.rect), screen.minX + half)
+        let hi = min(perchX(1, rect: host.rect), screen.maxX - half)
+        guard hi > lo else { return [] }
+        var ranges = [lo...hi]
+        for rect in surfaces.prefix(depth).map(\.rect) + occupied {
+            guard rect.maxY > y - 39 * scale, rect.minY < y + 9 * scale else { continue }
+            let left = rect.minX - half, right = rect.maxX + half
+            ranges = ranges.flatMap { range -> [ClosedRange<CGFloat>] in
+                if right <= range.lowerBound || left >= range.upperBound { return [range] }
+                var result: [ClosedRange<CGFloat>] = []
+                if left > range.lowerBound { result.append(range.lowerBound...left) }
+                if right < range.upperBound { result.append(right...range.upperBound) }
+                return result
+            }
+        }
+        return ranges.filter { $0.upperBound - $0.lowerBound > 0.01 }
+    }
     public static func quartz(_ cocoa: CGRect, primaryHeight: CGFloat) -> CGRect {
         CGRect(x: cocoa.minX, y: primaryHeight - cocoa.maxY, width: cocoa.width, height: cocoa.height)
     }

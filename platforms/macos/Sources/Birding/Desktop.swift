@@ -191,20 +191,32 @@ final class DesktopController: NSObject {
         func duration(to point: CGPoint) -> Double {
             entering ? max(2.8, Double(Geometry.distance(bird.position,point))/400 * Bird.flightSpeedMultiplier) : Double.random(in:2.6...4.8)
         }
-        let candidates = surfaces.filter { s in
-            s.layer == 0 && s.rect.width >= 180 && s.rect.height >= 100 &&
-            screenRects.contains { r in r.contains(CGPoint(x: s.rect.midX,y: s.rect.minY-15)) }
-        }.shuffled()
-        for host in candidates {
-            // Try several points so one covered section does not discard a usable edge.
-            for fraction in ([CGFloat.random(in: 0.12...0.88)] + stride(from: 0.12, through: 0.88, by: 0.095).map { CGFloat($0) }.shuffled()) {
-                let foot = CGPoint(x: Geometry.perchX(fraction, rect: host.rect), y: host.rect.minY)
-                let footprint = Geometry.landingFootprint(at: foot, scale: scale)
-                guard screenRects.contains(where: { $0.contains(footprint) }),
-                      Geometry.isLandingVisible(on: host.id, at: foot, surfaces: surfaces, scale: scale) else { continue }
-                bird.fraction = fraction
-                bird.fly(to: foot, host: host, duration: duration(to:foot))
-                return
+        let occupied = birds.filter { $0 !== bird && !$0.isDeparting }.compactMap { other -> CGRect? in
+            guard let id = other.hostID, let host = surfaces.first(where: { $0.id == id }) else { return nil }
+            let foot = CGPoint(x: Geometry.perchX(other.fraction, rect: host.rect), y: host.rect.minY)
+            return Geometry.landingFootprint(at: foot, scale: spriteScale(for: other)).insetBy(dx: -8, dy: -8)
+        }
+        var choices: [(Surface, ClosedRange<CGFloat>)] = []
+        for host in surfaces where host.layer == 0 && host.rect.width >= 180 && host.rect.height >= 100 {
+            for screen in screenRects {
+                for range in Geometry.landingRanges(on: host, surfaces: surfaces, screen: screen, scale: scale, occupied: occupied) {
+                    choices.append((host, range))
+                }
+            }
+        }
+        let total = choices.reduce(CGFloat.zero) { $0 + $1.1.upperBound - $1.1.lowerBound }
+        if total > 0 {
+            var ticket = CGFloat.random(in: 0..<total)
+            for (host, range) in choices {
+                let length = range.upperBound - range.lowerBound
+                if ticket < length {
+                    let foot = CGPoint(x: range.lowerBound + ticket, y: host.rect.minY)
+                    let start = Geometry.perchX(0, rect: host.rect), end = Geometry.perchX(1, rect: host.rect)
+                    bird.fraction = (foot.x - start) / (end - start)
+                    bird.fly(to: foot, host: host, duration: duration(to: foot))
+                    return
+                }
+                ticket -= length
             }
         }
         guard let screen = screenRects.randomElement() else { return }

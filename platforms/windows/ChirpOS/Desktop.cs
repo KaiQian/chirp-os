@@ -56,14 +56,28 @@ internal sealed class Desktop : ApplicationContext
     double Travel(Bird b, V target) => Math.Max(2.8, V.Distance(b.Position, target) / 400 * 2);
     void Destination(Bird b, bool entering = false)
     {
-        foreach (var s in surfaces.Where(s => s.CanPerch).OrderBy(_ => rng.Next()))
-        {
-            foreach (var f in Enumerable.Range(0, 9).Select(i => .12 + i * .095).OrderBy(_ => rng.Next()))
-            {
-                var foot = Geometry.Foot(s, f); var screen = Screen.FromPoint(new((int)foot.X, (int)foot.Y)); var scale = Settings.Scale * b.Species.Scale * Native.DpiScale(screen);
-                if (!Bounds(screen).Contains(Geometry.Landing(foot, scale)) || !Geometry.Visible(s.Id, foot, surfaces, scale)) continue;
-                b.Fraction = f; b.Fly(foot, s, entering ? Travel(b, foot) : 2.6 + rng.NextDouble() * 2.2, 90 * Native.DpiScale(screen)); return;
+        var occupied=flock.Where(x=>x.Bird!=b && !x.Bird.Departing && x.Bird.Host!=null).Select(x=>{
+            var host=surfaces.FirstOrDefault(s=>s.Id==x.Bird.Host);
+            if(host==null)return (Box?)null;
+            var foot=Geometry.Foot(host,x.Bird.Fraction);
+            var scale=Settings.Scale*x.Bird.Species.Scale*Native.DpiScale(Screen.FromPoint(new((int)foot.X,(int)foot.Y)));
+            var rect=Geometry.Landing(foot,scale);
+            return (Box?)new Box(rect.X-8,rect.Y-8,rect.W+16,rect.H+16);
+        }).Where(x=>x.HasValue).Select(x=>x!.Value).ToArray();
+        var choices=new List<(Surface Host,Screen Screen,double Lo,double Hi)>();
+        foreach(var host in surfaces.Where(s=>s.CanPerch))foreach(var screen in Screen.AllScreens){
+            var scale=Settings.Scale*b.Species.Scale*Native.DpiScale(screen);
+            foreach(var range in Geometry.LandingRanges(host,surfaces,Bounds(screen),scale,occupied))choices.Add((host,screen,range.Lo,range.Hi));
+        }
+        var total=choices.Sum(c=>c.Hi-c.Lo);var ticket=rng.NextDouble()*total;
+        foreach(var choice in choices){
+            var length=choice.Hi-choice.Lo;
+            if(ticket<length){
+                var foot=new V(choice.Lo+ticket,choice.Host.Rect.Y);
+                b.Fraction=(foot.X-Geometry.Foot(choice.Host,0).X)/(Geometry.Foot(choice.Host,1).X-Geometry.Foot(choice.Host,0).X);
+                b.Fly(foot,choice.Host,entering?Travel(b,foot):2.6+rng.NextDouble()*2.2,90*Native.DpiScale(choice.Screen));return;
             }
+            ticket-=length;
         }
         var screenFallback = Screen.AllScreens[rng.Next(Screen.AllScreens.Length)].WorkingArea;
         var p = new V(screenFallback.Left + 70 + rng.NextDouble() * Math.Max(1, screenFallback.Width - 140), screenFallback.Top + 110 + rng.NextDouble() * Math.Max(1, screenFallback.Height - 190)); b.Fly(p, null, entering ? Travel(b, p) : 4.5, 40);
@@ -90,7 +104,7 @@ internal sealed class Desktop : ApplicationContext
             for (var i = flock.Count - 1; i >= 0; i--) { var b = flock[i].Bird; var size = 48 * Scale(b); if (b.DepartureFinished && !Screen.AllScreens.Any(s => Bounds(s).Intersects(new(b.Position.X - size, b.Position.Y - size, size * 2, size * 2)))) { flock[i].View.Dispose(); flock.RemoveAt(i); departures++; } }
         }
         foreach (var (b, view) in flock) view.Render(b, atlases[b.Species.Id], frames[b.Frame], Scale(b), surfaces);
-        diagnosticAge += dt; if (diagnosticAge > 2) { diagnosticAge = 0; Directory.CreateDirectory(Program.DataFolder); File.WriteAllText(Path.Combine(Program.DataFolder, "diagnostics.json"), JsonSerializer.Serialize(new { version = "0.3.1", windowDetails = Native.WindowDiagnostics.ToArray(), windows = surfaces.Count, residents = flock.Count(x => !x.Bird.Departing), arrivals, departures, monitors = Screen.AllScreens.Length, birds = flock.Select(x => new { x.Bird.Species.Id, state = x.Bird.State.ToString(), x.Bird.Position, x.Bird.Landings, x.Bird.Followed, x.Bird.Startles }) }, Program.Json)); }
+        diagnosticAge += dt; if (diagnosticAge > 2) { diagnosticAge = 0; Directory.CreateDirectory(Program.DataFolder); File.WriteAllText(Path.Combine(Program.DataFolder, "diagnostics.json"), JsonSerializer.Serialize(new { version = "0.3.2", windowDetails = Native.WindowDiagnostics.ToArray(), windows = surfaces.Count, residents = flock.Count(x => !x.Bird.Departing), arrivals, departures, monitors = Screen.AllScreens.Length, birds = flock.Select(x => new { x.Bird.Species.Id, state = x.Bird.State.ToString(), x.Bird.Position, x.Bird.Landings, x.Bird.Followed, x.Bird.Startles }) }, Program.Json)); }
     }
     protected override void ExitThreadCore() { timer.Stop(); timer.Dispose(); tray.Visible = false; tray.Dispose(); settingsWindow?.Dispose(); foreach (var b in flock) b.View.Dispose(); foreach (var image in atlases.Values) image.Dispose(); menu.Dispose(); base.ExitThreadCore(); }
 }

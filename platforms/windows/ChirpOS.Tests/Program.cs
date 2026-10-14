@@ -47,4 +47,16 @@ Check(configured.State==BirdState.Landing && configured.Species.Scale==28.0/19 &
 Check(!(behavior with{PerchMin=20,PerchMax=10}).Valid && !(behavior with{FlapFPS=61}).Valid && !(behavior with{AdultLengthCM=double.NaN}).Valid,"invalid behavior rejected");
 var draft=System.Text.Json.JsonSerializer.Deserialize<Preferences>(System.Text.Json.JsonSerializer.Serialize(pref))!;draft.Behaviors[s.Id]=behavior with{Speed=.5};
 Check(pref.Resolve(s).Speed==1.5,"unsaved behavior edits do not mutate active settings");
+var edge=new Surface(100,new(0,300,1000,400));var desktop=new Box(0,0,1200,900);
+foreach(var cover in new[]{new Box(0,100,620,300),new Box(380,100,620,300)}){
+    var scene=new[]{new Surface(101,cover),edge};var ranges=Geometry.LandingRanges(edge,scene,desktop,1,[]);
+    Check(ranges.Count==1 && ranges[0].Hi-ranges[0].Lo>250,"partly covered edge offers continuous space");
+    Check(Enumerable.Range(1,99).All(i=>Geometry.Visible(edge.Id,new(ranges[0].Lo+(ranges[0].Hi-ranges[0].Lo)*i/100,300),scene,1)),"continuous samples remain unoccluded");
+}
+var reserved=Geometry.Landing(new(500,300),1.6);reserved=new(reserved.X-8,reserved.Y-8,reserved.W+16,reserved.H+16);
+var free=Geometry.LandingRanges(edge,new[]{edge},desktop,1,new[]{reserved});
+Check(free.Count==2 && free.All(r=>r.Hi<500 || r.Lo>500) && free.All(r=>!Geometry.Landing(new((r.Lo+r.Hi)/2,300),1).Intersects(reserved)),"standing and inbound reservations avoid overlap");
+Check(Geometry.LandingRanges(edge,new[]{edge},desktop,1,new[]{new Box(0,200,1000,500)}).Count==0,"full edge has no remaining destination");
+var clipped=new Surface(102,new(-1000,300,1500,400));var clippedRanges=Geometry.LandingRanges(clipped,new[]{clipped},desktop,1,[]);
+Check(clippedRanges.Count==1 && clippedRanges[0].Lo==29 && clippedRanges[0].Hi==458,"offscreen host retains exposed landing edge");
 Console.WriteLine($"{count} core checks passed.");

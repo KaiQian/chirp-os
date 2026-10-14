@@ -16,6 +16,26 @@ public readonly record struct Box(double X,double Y,double W,double H) {
 }
 public record Surface(long Id,Box Rect,bool Topmost=false,bool CanPerch=true);
 public static class Geometry {
+    public static List<(double Lo,double Hi)> LandingRanges(Surface host,IReadOnlyList<Surface> surfaces,Box screen,double scale,IReadOnlyList<Box> occupied) {
+        var depth=surfaces.ToList().FindIndex(s=>s.Id==host.Id);
+        var y=host.Rect.Y;var half=29*scale;
+        if(depth<0 || y-39*scale<screen.Y || y+9*scale>screen.Bottom)return [];
+        var lo=Math.Max(Foot(host,0).X,screen.X+half);var hi=Math.Min(Foot(host,1).X,screen.Right-half);
+        if(hi<=lo)return [];
+        var ranges=new List<(double Lo,double Hi)>{(lo,hi)};
+        foreach(var rect in surfaces.Take(depth).Select(s=>s.Rect).Concat(occupied)){
+            if(rect.Bottom<=y-39*scale || rect.Y>=y+9*scale)continue;
+            var left=rect.X-half;var right=rect.Right+half;
+            var next=new List<(double Lo,double Hi)>();
+            foreach(var range in ranges){
+                if(right<=range.Lo || left>=range.Hi){next.Add(range);continue;}
+                if(left>range.Lo)next.Add((range.Lo,left));
+                if(right<range.Hi)next.Add((right,range.Hi));
+            }
+            ranges=next;
+        }
+        return ranges.Where(r=>r.Hi-r.Lo>.01).ToList();
+    }
     public static V Foot(Surface s,double fraction) {var m=Math.Min(42,s.Rect.W/3);return new(s.Rect.X+m+(s.Rect.W-2*m)*Math.Clamp(fraction,0,1),s.Rect.Y);}
     public static Box Landing(V p,double scale)=>new(p.X-29*scale,p.Y-39*scale,58*scale,48*scale);
     public static bool Visible(long id,V p,IReadOnlyList<Surface> surfaces,double scale) {

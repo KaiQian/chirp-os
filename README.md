@@ -4,9 +4,9 @@
 
 | 平台 / Platform | 最新版本 / Latest release |
 | --- | --- |
-| Windows · Intel / AMD 64-bit | [下载 EXE · v0.3.1](https://github.com/billtt/chirp-os/releases/download/v0.3.1/ChirpOS-0.3.1-win-x64.exe) |
-| Windows · ARM64 / UTM | [下载 EXE · v0.3.1](https://github.com/billtt/chirp-os/releases/download/v0.3.1/ChirpOS-0.3.1-win-arm64.exe) |
-| macOS · Apple Silicon | [下载 ZIP · v0.2.0](https://github.com/billtt/chirp-os/releases/download/v0.2.0/ChirpOS-0.2.0-macOS-arm64.zip) |
+| Windows · Intel / AMD 64-bit | [下载 EXE · v0.3.2](https://github.com/billtt/chirp-os/releases/download/v0.3.2/ChirpOS-0.3.2-win-x64.exe) |
+| Windows · ARM64 / UTM | [下载 EXE · v0.3.2](https://github.com/billtt/chirp-os/releases/download/v0.3.2/ChirpOS-0.3.2-win-arm64.exe) |
+| macOS · Apple Silicon | [下载 ZIP · v0.3.2](https://github.com/billtt/chirp-os/releases/download/v0.3.2/ChirpOS-0.3.2-macOS-arm64.zip) |
 
 [所有版本 / All releases](https://github.com/billtt/chirp-os/releases) · [简体中文](#中文) · [English](#english)
 

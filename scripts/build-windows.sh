@@ -14,7 +14,7 @@ for rid in "${@:-win-arm64}"; do
     cp platforms/windows/Verify-Windows.cmd "$OUT/Verify-Windows.cmd"
     cp platforms/windows/README.md "$OUT/README.md"
     mkdir -p dist/releases
-    cp "$OUT/ChirpOS.exe" "$ROOT/dist/releases/ChirpOS-0.3.1-$rid.exe"
+    cp "$OUT/ChirpOS.exe" "$ROOT/dist/releases/ChirpOS-0.3.2-$rid.exe"
     if [[ "$(uname -s)" == Darwin && "$rid" == win-arm64 ]]; then
         SHARE="${CHIRPOS_SHARE_DIR:-$HOME/Downloads/share}"
         mkdir -p "$SHARE"
