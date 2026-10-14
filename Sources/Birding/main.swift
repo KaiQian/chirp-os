@@ -6,6 +6,12 @@ func argument(_ flag:String) -> String? {
 }
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
+if let path = argument("--export-icon") {
+    do {
+        try BirdArt().exportAppIcon(to:URL(fileURLWithPath:path),macOSMask:CommandLine.arguments.contains("--macos-mask"))
+        exit(0)
+    } catch { fputs("Icon export failed: \(error)\n",stderr); exit(1) }
+}
 if let path = argument("--export-art") {
     do { try BirdArt().export(to:URL(fileURLWithPath:path)); exit(0) }
     catch { fputs("Art export failed: \(error)\n",stderr); exit(1) }

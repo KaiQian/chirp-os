@@ -1,5 +1,6 @@
 import AppKit
 import BirdingCore
+import ServiceManagement
 
 enum SettingsVerification {
     static func run(to folder:URL) {
@@ -11,7 +12,20 @@ enum SettingsVerification {
             defer { prefs.removePersistentDomain(forName:suite) }
             let d=DesktopController();d.preferences=prefs
             d.settingsURL=folder.appendingPathComponent("settings.json");d.legacyURL=folder.appendingPathComponent("legacy.json")
-            d.makeMenu();d.showSpeciesSettings()
+            let login = VerificationLoginItem(); d.loginService = login
+            d.makeMenu()
+            checks["loginInitiallyOff"] = d.loginItem?.state == .off && d.loginItem?.title == "随系统启动" && login.registerCalls == 0
+            d.toggleLoginItem()
+            checks["loginEnable"] = login.registerCalls == 1 && d.loginItem?.state == .on
+            d.toggleLoginItem()
+            checks["loginDisable"] = login.unregisterCalls == 1 && d.loginItem?.state == .off
+            login.status = .requiresApproval; d.menuWillOpen(d.status.menu!)
+            checks["loginApprovalVisible"] = d.loginItem?.state == .mixed && d.loginApprovalItem?.isHidden == false
+            d.toggleLoginItem()
+            checks["loginPendingCanCancel"] = login.unregisterCalls == 2 && d.loginItem?.state == .off && d.loginApprovalItem?.isHidden == true
+            login.status = .enabled; d.menuWillOpen(d.status.menu!)
+            checks["loginExternalChangeRefreshes"] = d.loginItem?.state == .on
+            d.showSpeciesSettings()
             let w=d.settingsWindow!
             checks["sevenEditableRows"] = w.sliders.count == 7 && w.fields.count == 7 && w.locks.count == 7
             w.sliders[0].doubleValue=35;w.sliderChanged(w.sliders[0])
@@ -33,6 +47,7 @@ enum SettingsVerification {
             checks["invalidBehaviorNotSaved"] = !FileManager.default.fileExists(atPath:d.settingsURL.path)
             w.detailFields[0][2].stringValue="1.25"
             d.paused=true;d.makeMenu();d.toggleLanguage()
+            checks["loginEnglishLabel"] = d.loginItem?.title == "Launch at Login" && d.loginItem?.state == .on
             checks["englishMenuAndWindow"] = d.status.menu!.items.contains{$0.title == "中文"} && d.status.menu!.items.contains{$0.title=="Resume animation"} && w.window!.title == "Bird Settings"
             checks["languageKeepsUnsavedEdits"] = w.draft.probabilities == before && w.detailFields[0][2].stringValue == "1.25"
             w.save()
@@ -81,4 +96,13 @@ enum SettingsVerification {
         guard let png=bitmap.representation(using:.png,properties:[:]) else { throw NSError(domain:"Snapshot",code:2) }
         try png.write(to:url)
     }
+}
+
+// Test menu actions without changing the user's system login items.
+private final class VerificationLoginItem: LoginItemManaging {
+    var status: SMAppService.Status = .notRegistered
+    var registerCalls = 0
+    var unregisterCalls = 0
+    func register() throws { registerCalls += 1; status = .enabled }
+    func unregister() throws { unregisterCalls += 1; status = .notRegistered }
 }

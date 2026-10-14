@@ -1,10 +1,14 @@
-# Birding · 桌面观鸟 / Desktop Birdwatching
+# 啾啾 ChirpOS · 桌面观鸟 / Desktop Birdwatching
+
+<img src="Assets/AppIcon.png" alt="啾啾 ChirpOS app icon" width="160">
+
+**让你的桌面，时不时来只鸟。 / A little birdlife on your desktop.**
 
 [简体中文](#中文) | [English](#english)
 
 ## 中文
 
-一个实际运行在 macOS 桌面上的 Swift / AppKit 原型。七种上海鸟类陆续从屏幕外飞入，在应用窗口之间飞行，落在顶沿，眨眼、呼吸、整理羽毛。缓慢移动承载窗口时随行，快速移动时受惊飞走。屏幕叠加层透明、不抢焦点、鼠标穿透；菜单栏的小鸟图标提供控制。
+啾啾是一款使用 Swift / AppKit 开发的 macOS 原生桌面观鸟应用。七种上海鸟类陆续从屏幕外飞入，在应用窗口之间飞行，落在顶沿，眨眼、呼吸、整理羽毛。缓慢移动承载窗口时随行，快速移动时受惊飞走。屏幕叠加层透明、不抢焦点、鼠标穿透；菜单栏的小鸟图标提供控制。
 
 ![七种鸟的成年体长比例](Assets/Species/species-lineup.png)
 
@@ -18,7 +22,7 @@ cd ~/projects/birding
 ./scripts/run.sh
 ```
 
-也可在 Finder 双击 `dist/Birding.app`。构建使用本机架构；在 Intel Mac 上构建即产生 Intel 版本。应用为本地 ad-hoc 签名，没有公证，不是可直接分发的正式发行版。
+也可在 Finder 双击 `dist/ChirpOS.app`。构建使用本机架构；在 Intel Mac 上构建即产生 Intel 版本。应用为本地 ad-hoc 签名，没有公证，不是可直接分发的正式发行版。
 
 启动时桌面上没有鸟，约 0.8 秒后生成第一只屏幕外的小鸟，它会飞入并寻找可落脚的窗口。移动窗口时请抓住应用自己的标题栏，小鸟完全不拦截鼠标。菜单栏里可暂停动画、让小鸟重新飞行、切换 1× / 1.5× 像素大小、选择 3–5 / 8–12 / 15–20 只或自定义鸟群范围、鸟种设置和中英文切换，以及退出。暂停同时冻结动画和鸟群进出计时；窗口移动时仍跟随宿主以保持位置正确。
 
@@ -30,7 +34,7 @@ cd ~/projects/birding
 
 当前实现用约 30 Hz 的窗口元数据轮询跟随拖动，因此不需要 Accessibility API，也不会受个别应用只在拖动结束时发送 AX 通知的影响。Apple 的安全说明明确区分窗口元数据与受保护的名称/屏幕内容。某些系统版本、受管理设备或特殊窗口仍可能限制可见元数据；无可用窗口时小鸟继续自由飞行。遇到这种情况可用下面的诊断选项检查窗口数量。
 
-`verify-desktop.sh` 用另外一个本地进程创建测试窗口，自动移动的是这些专用测试窗口。它不操作用户其他应用。测试中的像素截图是本应用渲染到离屏位图，不录制桌面，不需要录屏权限。如果额外使用 macOS `screencapture` 抓取真实桌面，系统可能要求调用工具所属应用获得「屏幕与系统音频录制」许可；这不是 Birding 正常运行的前置条件。
+`verify-desktop.sh` 用另外一个本地进程创建测试窗口，自动移动的是这些专用测试窗口。它不操作用户其他应用。测试中的像素截图是本应用渲染到离屏位图，不录制桌面，不需要录屏权限。如果额外使用 macOS `screencapture` 抓取真实桌面，系统可能要求调用工具所属应用获得「屏幕与系统音频录制」许可；这不是啾啾正常运行的前置条件。
 
 ### 动画与美术
 
@@ -41,7 +45,7 @@ cd ~/projects/birding
 - 站立 / idle：站立、呼吸、眨眼、两帧理羽，以及两个物种习性动作槽位。每种鸟共有 18 个命名帧，部分槽位共用姿态。
 - 站立和着陆帧使用固定足部锚点，左飞时围绕足部镜像；麻雀轻跳通过绘制偏移实现，宿主锚点仍被跟踪。最近邻采样保持像素边缘。
 
-`Assets/` 中保留原有红耳鹎的透明 PNG、联络表和 `flight-preview.gif`；`Assets/Species/` 保存七种鸟的完整导出。普通构建重新生成基础红耳鹎素材，`preview-species.sh` 重新生成全部鸟种素材。运行时从同一份绘制定义缓存 CGImage，不依赖导出的 PNG；鸟种配置另行打包。
+`Assets/` 仅保留方形图标源图和文档使用的两张鸟种总览。普通构建只导出图标；`preview-species.sh` 将全部逐帧 PNG、联络表和 GIF 生成到 `.build/species-preview/`，并刷新 `Assets/Species/` 中的总览。运行时从绘制定义缓存 CGImage，不依赖导出的 PNG；鸟种配置另行打包。
 
 ### 窗口与遮挡实现
 
@@ -75,13 +79,13 @@ cd ~/projects/birding
 
 菜单中的退出会停止所有轮询。睡眠时计时器停止，唤醒后恢复。使用 Core Animation 独立小鸟图层、最近邻纹理与形状遮罩，每帧只更新小型精灵的位置和帧内容，避免整屏 AppKit 重绘的显示列表累积。
 
-### 原型边界
+### 使用范围与限制
 
 - 遮挡按窗口外接矩形估算：不精确匹配圆角、透明玻璃、异形窗口、阴影或窗口内容中的透明洞。
 - 元数据轮询存在约一到两帧延迟；受 CPU 负载和系统调度影响，高速拖动时可能短暂错位。
-- 全屏、Stage Manager、Mission Control、锁屏及系统安全界面由 macOS 管理。普通桌面是本原型验证范围，无法保证在所有特殊系统界面中保持相同视觉效果。
+- 全屏、Stage Manager、Mission Control、锁屏及系统安全界面由 macOS 管理。普通桌面是本应用的验证范围，无法保证在所有特殊系统界面中保持相同视觉效果。
 - 多显示器坐标逻辑有单元测试，实际外接显示器/缩放组合需要对应硬件验证。
-- 鸟群数量范围会保存到本机偏好设置；本版本没有音效、完整生态模拟、自动启动或安装器。
+- 鸟群数量范围会保存到本机偏好设置；本版本没有音效、完整生态模拟或安装器。
 
 ### 代码索引
 
@@ -192,7 +196,7 @@ cd ~/projects/birding
 ./scripts/preview-species.sh
 ```
 
-生成 `Assets/Species/species-lineup.png`、9 秒循环的 `species-animations.gif`，以及各鸟种的 18 张透明帧、联络表和飞行 GIF。总览以桌面默认尺寸的 2 倍展示，仍保持鸟种间比例。运行时由同一份美术定义缓存纹理。
+生成 `Assets/Species/species-lineup.png`、9 秒循环的 `species-animations.gif`，并在 `.build/species-preview/` 中生成各鸟种的 18 张透明帧、联络表和飞行 GIF。总览以桌面默认尺寸的 2 倍展示，仍保持鸟种间比例。运行时由同一份美术定义缓存纹理。
 
 本次验证：31 项核心测试（包含权重、禁用物种、配置边界、比例、不同体型落点、行为及层级）、13 项真实窗口检查、7 项鸟群生命周期检查；美术导出还检查七种站立图互不相同、126 个非空帧及每种 8 个不同飞行姿态。已人工检查导出的体型总览和代表性完整帧表。图层/离屏预览不等同于完整的生态模拟或长期统计验证。
 
@@ -210,7 +214,7 @@ cd ~/projects/birding
 
 ### 双语界面与概率设置验证
 
-当前版本通过 38 项核心测试、14 项设置界面检查、13 项窗口检查和 7 项鸟群生命周期检查。概率测试还模拟 10,000 次调整与锁定操作，检查总和和锁定值；测试覆盖 0%、100%、全锁定、仅一个未锁定、输入限制、零值平均分配、旧配置迁移及保存恢复。
+当前版本通过 38 项核心测试、21 项设置界面检查、13 项窗口检查和 7 项鸟群生命周期检查。概率测试还模拟 10,000 次调整与锁定操作，检查总和和锁定值；测试覆盖 0%、100%、全锁定、仅一个未锁定、输入限制、零值平均分配、旧配置迁移及保存恢复。
 
 `verify-settings.sh` 使用临时目录与独立偏好设置，不更改用户的设置。报告和中英文界面离屏截图位于 `.build/settings-check.XXXXXX/`。这些截图只包含本应用的设置界面。
 
@@ -219,7 +223,7 @@ cd ~/projects/birding
 
 ## English
 
-A working native macOS prototype built with Swift and AppKit. Seven Shanghai bird species arrive from outside the screen, fly between application windows, perch on their top edges, blink, breathe, and preen. Birds follow a slowly moved window and take flight when it moves quickly. Transparent overlays neither take focus nor intercept mouse input. A menu bar bird icon provides controls.
+A native macOS desktop birdwatching app built with Swift and AppKit. Seven Shanghai bird species arrive from outside the screen, fly between application windows, perch on their top edges, blink, breathe, and preen. Birds follow a slowly moved window and take flight when it moves quickly. Transparent overlays neither take focus nor intercept mouse input. A menu bar bird icon provides controls.
 
 ![Seven species at their relative adult body lengths](Assets/Species/species-lineup.png)
 
@@ -233,7 +237,7 @@ cd ~/projects/birding
 ./scripts/run.sh
 ```
 
-You can also double-click `dist/Birding.app` in Finder. The build targets the host architecture; building on an Intel Mac produces an Intel executable. The app is locally ad-hoc signed and is not notarized or packaged as a public release.
+You can also double-click `dist/ChirpOS.app` in Finder. The build targets the host architecture; building on an Intel Mac produces an Intel executable. The app is locally ad-hoc signed and is not notarized or packaged as a public release.
 
 The desktop starts without birds. About 0.8 seconds after launch, the first bird is created outside the screen and flies in to find a perch. Drag application title bars normally: birds do not intercept your mouse. The menu supports pause, another flight, 1× / 1.5× display size, population presets of 3–5 / 8–12 / 15–20 birds, a custom range, bird settings, language switching, and quit. Pause freezes animation and population timers; perched birds still follow moving host windows.
 
@@ -241,11 +245,11 @@ After changing source code, run `build.sh`, quit the previous instance from its 
 
 ### Permissions and privacy
 
-Basic operation **does not request Accessibility, Input Monitoring, Screen Recording, or Automation permissions**. The public `CGWindowListCopyWindowInfo` API supplies window IDs, owning processes, bounds, levels, and front-to-back order. Birding does not read window titles, capture other applications' content, or send network requests. The Swift app does not enable App Sandbox; this is separate from the sandbox used by Codex during development.
+Basic operation **does not request Accessibility, Input Monitoring, Screen Recording, or Automation permissions**. The public `CGWindowListCopyWindowInfo` API supplies window IDs, owning processes, bounds, levels, and front-to-back order. ChirpOS does not read window titles, capture other applications' content, or send network requests. The Swift app does not enable App Sandbox; this is separate from the sandbox used by Codex during development.
 
 Window metadata is polled at approximately 30 Hz to follow dragging, so the implementation does not depend on Accessibility notifications that some applications deliver only after a drag ends. Apple's security guidance distinguishes window metadata from protected names and screen content. Some OS versions, managed devices, or special windows may still restrict metadata. Birds continue free flight when no usable windows are available; the diagnostics option below reports the window count.
 
-`verify-desktop.sh` creates dedicated test windows in a separate local process and moves only those windows. Its pixel snapshots render Birding's own layers into offscreen bitmaps; they do not record the desktop or require screen recording access. Taking an additional real desktop screenshot with macOS `screencapture` may require the calling application to have Screen & System Audio Recording permission. That is not a prerequisite for normal Birding operation.
+`verify-desktop.sh` creates dedicated test windows in a separate local process and moves only those windows. Its pixel snapshots render ChirpOS's own layers into offscreen bitmaps; they do not record the desktop or require screen recording access. Taking an additional real desktop screenshot with macOS `screencapture` may require the calling application to have Screen & System Audio Recording permission. That is not a prerequisite for normal ChirpOS operation.
 
 ### Animation and artwork
 
@@ -256,17 +260,17 @@ All artwork consists of original 48×48 pixel drawings, defined in `Sources/Bird
 - Perching: standing, breathing, blinking, two preening frames, and two additional idle slots for species-specific behavior. There are 18 named frames per species; some slots share a pose.
 - Standing and landing use a consistent foot anchor. Left-facing birds mirror around it. Sparrow hops add a small drawing offset while retaining their tracked host anchor. Nearest-neighbor sampling preserves crisp pixel edges.
 
-`Assets/` contains the original bulbul's transparent PNGs, contact sheet, and `flight-preview.gif`. `Assets/Species/` contains the seven-species exports. Regular builds regenerate the base bulbul assets; `preview-species.sh` regenerates the complete species collection. Runtime images are cached from the same drawing definitions rather than loaded from exported PNGs. Species configuration is bundled separately.
+`Assets/` contains only the square icon artwork and two species overviews used by the documentation. Regular builds export only the icon. `preview-species.sh` writes all frame PNGs, contact sheets, and GIFs to `.build/species-preview/` and refreshes the overviews in `Assets/Species/`. Runtime images are cached from drawing definitions rather than loaded from exported PNGs. Species configuration is bundled separately.
 
 ### Windows and occlusion
 
-Each display receives a borderless, nonactivating `NSPanel` with `ignoresMouseEvents = true`. Panels cannot become key or main windows. They use the floating window level, join all Spaces, and participate as fullscreen auxiliary windows. There is no ordinary main window or Dock icon, and Birding never raises the host application window.
+Each display receives a borderless, nonactivating `NSPanel` with `ignoresMouseEvents = true`. Panels cannot become key or main windows. They use the floating window level, join all Spaces, and participate as fullscreen auxiliary windows. There is no ordinary main window or Dock icon, and ChirpOS never raises the host application window.
 
 Positions use global Quartz coordinates, with the origin at the top left and Y increasing downward. AppKit coordinates are converted per display, including layouts with negative coordinates to the left of or above the main screen. Display, Space, sleep, and wake changes rebuild overlays or refresh metadata.
 
 The window list retains WindowServer's front-to-back order. Each bird stores a host window ID and a normalized horizontal perch position. Bounds updates immediately update its feet; resizing preserves its relative position. A disappearing, minimized, or unavailable host releases its bird. A move exceeding 8 pt and 950 pt/s between valid samples triggers a startle. Sample gaps of 0.2 seconds or more are excluded from velocity checks to avoid false alarms after sleep or stalls.
 
-During flight, birds remain above ordinary windows. Only when their feet reach the destination and landing begins do they adopt the host's logical depth. Rectangles of windows in front of the host, up to the overlay's level, are subtracted from the sprite's drawing region. **This simulates occlusion visually; the actual overlay is not inserted between other applications' windows in WindowServer.** Sequential subtraction avoids holes where occluders overlap. Higher-level utility windows can still cover flying birds. Menus, system interfaces, and lock-screen surfaces above the overlay are naturally handled by WindowServer; Birding does not raise itself above them.
+During flight, birds remain above ordinary windows. Only when their feet reach the destination and landing begins do they adopt the host's logical depth. Rectangles of windows in front of the host, up to the overlay's level, are subtracted from the sprite's drawing region. **This simulates occlusion visually; the actual overlay is not inserted between other applications' windows in WindowServer.** Sequential subtraction avoids holes where occluders overlap. Higher-level utility windows can still cover flying birds. Menus, system interfaces, and lock-screen surfaces above the overlay are naturally handled by WindowServer; ChirpOS does not raise itself above them.
 
 ### Verification
 
@@ -290,13 +294,13 @@ Optional live diagnostics overwrite one local JSON file every second:
 
 Quit stops polling. Sleep stops the timer, and wake restarts it. Independent Core Animation sprite layers, nearest-neighbor textures, and shape masks update small sprite regions rather than accumulating fullscreen AppKit display lists.
 
-### Prototype limitations
+### Scope and limitations
 
 - Occlusion uses window bounding rectangles, not exact rounded corners, translucent glass, irregular shapes, shadows, or transparent holes.
 - Metadata polling introduces roughly one or two frames of latency. Fast dragging or system load may cause temporary misalignment.
 - Fullscreen, Stage Manager, Mission Control, lock screens, and security interfaces are managed by macOS. Ordinary desktops are the validated scope; behavior across all special system interfaces is not guaranteed.
 - Multiple-display coordinate logic is unit-tested. Actual external-display and scaling combinations still require the relevant hardware to verify visually.
-- Population preferences persist locally. This version has no sound, complete ecological simulation, launch-at-login feature, or installer.
+- Population preferences persist locally. This version has no sound, complete ecological simulation or installer.
 
 ### Source map
 
@@ -329,9 +333,9 @@ All paths below are relative to `Sources/` unless otherwise noted.
 
 ### Initial local verification — October 13, 2026
 
-The initial prototype was built, signed, and launched on Apple Silicon running macOS 26.6.2. At that stage, 12 core tests and 13 desktop integration checks passed. Two displays, each with 2560×1440 logical resolution, were detected and received separate overlays. Exported layers were inspected for sprite direction, pixel edges, and partial occlusion.
+The first version was built, signed, and launched on Apple Silicon running macOS 26.6.2. At that stage, 12 core tests and 13 desktop integration checks passed. Two displays, each with 2560×1440 logical resolution, were detected and received separate overlays. Exported layers were inspected for sprite direction, pixel edges, and partial occlusion.
 
-The Mac had login/lock-screen layers during that verification, and the system screenshot command did not produce an image. That run therefore did not establish manual acceptance on an unlocked desktop. Window-following and occlusion checks used a separate process with real WindowServer windows; layer snapshots contained only Birding's own pixels. Actual visual alignment across displays still benefits from checking on an unlocked desktop.
+The Mac had login/lock-screen layers during that verification, and the system screenshot command did not produce an image. That run therefore did not establish manual acceptance on an unlocked desktop. Window-following and occlusion checks used a separate process with real WindowServer windows; layer snapshots contained only ChirpOS's own pixels. Actual visual alignment across displays still benefits from checking on an unlocked desktop.
 
 ### Artwork and timing update — October 14, 2026
 
@@ -406,7 +410,7 @@ The app saves automatically when you choose Save & Apply, using `~/Library/Appli
 ./scripts/preview-species.sh
 ```
 
-This generates `Assets/Species/species-lineup.png`, the nine-second looping `species-animations.gif`, and 18 transparent frames, a contact sheet, and a flight GIF for each species. The comparison shows birds at twice their default desktop size while preserving relative proportions. Runtime textures use the same artwork definitions.
+This generates `Assets/Species/species-lineup.png`, the nine-second looping `species-animations.gif`, and, in `.build/species-preview/`, 18 transparent frames, a contact sheet, and a flight GIF for each species. The comparison shows birds at twice their default desktop size while preserving relative proportions. Runtime textures use the same artwork definitions.
 
 This update passed 31 core tests, 13 real-window checks, and seven population lifecycle checks. The artwork exporter verifies seven distinct standing images, 126 nonempty frames, and eight distinct flight images per species. Exported size comparisons and representative complete contact sheets were visually inspected. Offscreen/layer previews do not establish a complete ecological simulation or long-term statistical validation.
 
@@ -424,6 +428,22 @@ Adult sizes and field marks draw on the Hong Kong Bird Watching Society and Corn
 
 ### Bilingual UI and probability validation
 
-The current version passes 38 core tests, 14 settings UI checks, 13 desktop checks, and seven population lifecycle checks. Probability tests include 10,000 edits and lock changes while checking exact totals and unchanged locks, plus 0%, 100%, fully locked and single-unlocked states, clamping, zero-value redistribution, legacy migration, and persistence.
+The current version passes 38 core tests, 21 settings UI checks, 13 desktop checks, and seven population lifecycle checks. Probability tests include 10,000 edits and lock changes while checking exact totals and unchanged locks, plus 0%, 100%, fully locked and single-unlocked states, clamping, zero-value redistribution, legacy migration, and persistence.
 
 `verify-settings.sh` uses a temporary directory and isolated preferences, leaving user settings untouched. Reports and English/Chinese offscreen screenshots are written to `.build/settings-check.XXXXXX/`. These images contain only this app's settings UI.
+
+### 品牌与应用图标 / Branding and app icon
+
+中文名称为 **啾啾**，英文名称为 **ChirpOS**。应用图标沿用原创红耳鹎像素美术，搭配浅灰背景与窗沿。`Assets/AppIcon.png` 是无圆角的方形源图；当前传统 `.icns` 构建在 `.build/AppIcon-macOS/` 生成带圆角和透明留白的版本，再打包完整尺寸图标。内部 Swift 模块、应用标识和原有设置目录保持兼容，已有偏好无需迁移。
+
+The Chinese name is **啾啾** and the English name is **ChirpOS**. The app icon features the original pixel-art Red-whiskered Bulbul on a pale window ledge against a light gray background. `Assets/AppIcon.png` is square source artwork without rounded corners. The current legacy `.icns` build creates a rounded version with transparent margins in `.build/AppIcon-macOS/`, then packages the full icon size set. Internal Swift modules, bundle identifier, and the existing settings location remain compatible, preserving your preferences.
+
+### 随系统启动 / Launch at Login
+
+菜单中的「随系统启动」控制登录当前 macOS 用户后自动启动啾啾；勾选表示已启用。状态直接读取系统登录项，每次打开菜单都会刷新。如果显示「需系统批准」，可以选择「在系统设置中允许…」完成授权，或再次点击开关取消注册。默认不主动注册。建议先将应用放在固定位置，再启用；保留 `dist/ChirpOS.app` 时不要删除该目录。注册失败会显示错误，不会伪装为已开启。
+
+**Launch at Login** starts ChirpOS when you sign in to your macOS account. A checkmark means it is enabled. The menu reads the system's actual status whenever it opens. If approval is required, choose **Allow in System Settings…**, or click the toggle again to unregister. The app does not register automatically. Keep the app in a stable location before enabling; if using `dist/ChirpOS.app`, keep that directory. Registration errors are displayed without falsely reporting success.
+
+使用 macOS 13+ 的 [SMAppService.mainApp](https://developer.apple.com/documentation/servicemanagement/smappservice)；不安装额外后台服务。 / Uses macOS 13+ `SMAppService.mainApp` without installing a separate background service.
+
+登录项菜单另有 7 项隔离检查，覆盖开启、关闭、待批准取消、系统状态刷新和英文显示；使用模拟服务，不改动用户登录项，也不代表已执行真实注销再登录验证。 / Seven isolated login-menu checks cover enabling, disabling, canceling pending approval, refreshing system state, and English labels. They use a simulated service, leave user login items unchanged, and do not constitute a logout/login test.

@@ -17,9 +17,9 @@ final class FixtureController {
     func start() {
         let visible = NSScreen.screens.first!.visibleFrame
         let w = min(640, visible.width*0.6), h: CGFloat = 310
-        host = window(frame:CGRect(x:visible.midX-w/2,y:visible.midY-h/2,width:w,height:h),title:"Birding · Window habitat",color:NSColor(calibratedRed:0.13,green:0.22,blue:0.24,alpha:1))
+        host = window(frame:CGRect(x:visible.midX-w/2,y:visible.midY-h/2,width:w,height:h),title:"ChirpOS · Window habitat",color:NSColor(calibratedRed:0.13,green:0.22,blue:0.24,alpha:1))
         host.orderFrontRegardless()
-        cover = window(frame:CGRect(x:host.frame.midX+14,y:host.frame.maxY-110,width:280,height:210),title:"Birding · Foreground",color:NSColor(calibratedRed:0.31,green:0.24,blue:0.22,alpha:1))
+        cover = window(frame:CGRect(x:host.frame.midX+14,y:host.frame.maxY-110,width:280,height:210),title:"ChirpOS · Foreground",color:NSColor(calibratedRed:0.31,green:0.24,blue:0.22,alpha:1))
         saveJSON(["host":host.windowNumber,"cover":cover.windowNumber,"pid":ProcessInfo.processInfo.processIdentifier], to:folder.appendingPathComponent("fixture.json"))
         timer = Timer.scheduledTimer(withTimeInterval:1.0/30,repeats:true) { [weak self] _ in self?.tick() }
     }

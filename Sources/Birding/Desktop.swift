@@ -60,6 +60,9 @@ final class DesktopView: NSView {
 }
 
 final class DesktopController: NSObject {
+    var loginService: LoginItemManaging = SystemLoginItem()
+    var loginItem: NSMenuItem?
+    var loginApprovalItem: NSMenuItem?
     let art = BirdArt()
     let arts = Dictionary(uniqueKeysWithValues: SpeciesID.allCases.map { ($0, BirdArt(species:$0)) })
     var settings = BirdSettings()
@@ -267,8 +270,9 @@ final class DesktopController: NSObject {
     func makeMenu() {
         if status == nil { status = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength) }
         let icon = NSImage(cgImage: art.frames["stand"]!, size: NSSize(width: 24,height: 24))
-        status.button?.image = icon; status.button?.toolTip = t("Birding · 桌面观鸟","Birding · Desktop Birdwatching")
+        status.button?.image = icon; status.button?.toolTip = t("啾啾 · 桌面观鸟","ChirpOS · Desktop Birdwatching")
         let menu = NSMenu()
+        menu.delegate = self
         statusLine = NSMenuItem(title: t("桌面鸟群 · 等待第一只鸟飞来","Birds · Waiting for the first arrival"), action: nil, keyEquivalent: "")
         menu.addItem(statusLine); menu.addItem(.separator())
         add(menu,paused ? t("继续动画","Resume animation") : t("暂停动画","Pause animation"),#selector(togglePause),"p")
@@ -286,14 +290,15 @@ final class DesktopController: NSObject {
         refreshPopulationMenu()
         menu.addItem(.separator())
         add(menu,t("鸟种设置…","Bird settings…"),#selector(showSpeciesSettings),"")
+        addLoginItem(to:menu)
         add(menu,language.switchTitle,#selector(toggleLanguage),"")
         add(menu,t("打开项目说明","Open README"),#selector(openReadme),"")
-        add(menu,t("退出 Birding","Quit Birding"),#selector(quit),"q")
+        add(menu,t("退出啾啾","Quit ChirpOS"),#selector(quit),"q")
         status.menu = menu
         updateStatusLine()
         let main=NSMenu()
         let application=NSMenuItem();main.addItem(application);application.submenu=NSMenu()
-        add(application.submenu!,t("退出 Birding","Quit Birding"),#selector(quit),"q")
+        add(application.submenu!,t("退出啾啾","Quit ChirpOS"),#selector(quit),"q")
         let editItem=NSMenuItem(title:t("编辑","Edit"),action:nil,keyEquivalent:"")
         let edit=NSMenu(title:editItem.title);editItem.submenu=edit;main.addItem(editItem)
         for (title,action,key) in [(t("撤销","Undo"),"undo:","z"),(t("剪切","Cut"),"cut:","x"),(t("复制","Copy"),"copy:","c"),(t("粘贴","Paste"),"paste:","v"),(t("全选","Select All"),"selectAll:","a")] {

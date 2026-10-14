@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BIN="$ROOT/dist/Birding.app/Contents/MacOS/Birding"
+BIN="$ROOT/dist/ChirpOS.app/Contents/MacOS/Birding"
 [[ -x "$BIN" ]] || "$ROOT/scripts/build.sh"
 OUT="$(mktemp -d "$ROOT/.build/settings-check.XXXXXX")"
 "$BIN" --verify-settings "$OUT"
