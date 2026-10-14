@@ -10,6 +10,8 @@
 
 [所有版本 / All releases](https://github.com/billtt/chirp-os/releases) · [简体中文](#中文) · [English](#english)
 
+![啾啾桌面运行预览 / ChirpOS desktop preview](preview.gif)
+
 **让你的桌面，时不时来只鸟。 / A little birdlife on your desktop.**
 
 ![啾啾的七种像素小鸟 / Seven pixel-art birds](Assets/Species/species-animations.gif)
