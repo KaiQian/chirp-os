@@ -14,7 +14,6 @@
 
 **让你的桌面，时不时来只鸟。 / A little birdlife on your desktop.**
 
-![啾啾的七种像素小鸟 / Seven pixel-art birds](Assets/Species/species-animations.gif)
 
 ## 中文
 
