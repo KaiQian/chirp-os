@@ -1,10 +1,10 @@
 # 啾啾 ChirpOS · Windows
 
-[下载 / Download](https://github.com/billtt/chirp-os/releases/tag/v0.3.2) · [项目介绍 / About ChirpOS](../../README.md) · [开发指南 / Development](../../docs/DEVELOPMENT.md)
+[下载 / Download](https://github.com/billtt/chirp-os/releases/tag/v0.3.3) · [项目介绍 / About ChirpOS](../../README.md) · [开发指南 / Development](../../docs/DEVELOPMENT.md)
 
 ## 中文
 
-下载适合电脑架构的 EXE，直接运行，无需微软商店、管理员权限或额外安装 .NET。
+下载适合电脑架构的 ZIP，解压后运行 ChirpOS.exe，无需微软商店、管理员权限或额外安装 .NET。
 
 - **x64**：Intel / AMD 64 位 Windows 10/11。
 - **ARM64**：Windows 11 ARM64，包括 Apple Silicon 上的 UTM。
@@ -15,7 +15,7 @@
 
 ## English
 
-Download and run the EXE for your architecture. No Microsoft Store, administrator access, or separate .NET installation is required.
+Download the ZIP for your architecture, extract it, and run ChirpOS.exe. No Microsoft Store, administrator access, or separate .NET installation is required.
 
 - **x64:** Intel/AMD Windows 10/11.
 - **ARM64:** Windows 11 ARM64, including UTM on Apple Silicon.

@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing release tag (for example v0.3.2)
+        description: Existing release tag (for example v0.3.3)
         required: true
 permissions:
   contents: read
@@ -29,23 +29,52 @@ jobs:
           VERSION=$(sed -n 's/.*<Version>\([^<]*\)<\/Version>.*/\1/p' platforms/windows/ChirpOS/ChirpOS.csproj)
           test "$RELEASE_TAG" = "v$VERSION"
           test -f "docs/releases/$RELEASE_TAG.md"
-      - name: Test and build all platforms
+      - name: Configure Apple signing and notarization
+        env:
+          CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          API_KEY: ${{ secrets.APPLE_API_KEY_P8 }}
+          API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          API_ISSUER: ${{ secrets.APPLE_API_ISSUER_ID }}
         run: |
+          set -euo pipefail
+          test -n "$CERTIFICATE" && test -n "$API_KEY" && test -n "$API_KEY_ID" && test -n "$API_ISSUER"
+          KEYCHAIN="$RUNNER_TEMP/chirpos-signing.keychain-db"
+          KEYCHAIN_PASSWORD=$(openssl rand -hex 32)
+          echo "::add-mask::$KEYCHAIN_PASSWORD"
+          printf '%s' "$CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/signing.p12"
+          printf '%s' "$API_KEY" > "$RUNNER_TEMP/AuthKey.p8"
+          chmod 600 "$RUNNER_TEMP/signing.p12" "$RUNNER_TEMP/AuthKey.p8"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/signing.p12" -P "$CERTIFICATE_PASSWORD" -k "$KEYCHAIN" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain-db
+          xcrun notarytool store-credentials chirpos-notary --key "$RUNNER_TEMP/AuthKey.p8" --key-id "$API_KEY_ID" --issuer "$API_ISSUER"
+      - name: Test and build all platforms
+        env:
+          CHIRPOS_SIGNING_IDENTITY: ${{ vars.MACOS_SIGNING_IDENTITY }}
+        run: |
+          test -n "$CHIRPOS_SIGNING_IDENTITY"
           bash scripts/test.sh
           bash scripts/build.sh
           bash scripts/build-windows.sh win-arm64 win-x64
-          VERSION=${RELEASE_TAG#v}
-          ARCH=$(uname -m)
-          ditto -c -k --keepParent dist/ChirpOS.app "dist/releases/ChirpOS-$VERSION-macOS-$ARCH.zip"
+          bash scripts/notarize-macos.sh
       - name: Publish one combined release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           cd dist/releases
           VERSION=${RELEASE_TAG#v}
-          shasum -a 256 ChirpOS-* > SHA256SUMS.txt
+          shasum -a 256 "ChirpOS-$VERSION-macOS-"*.zip "ChirpOS-$VERSION-win-arm64.zip" "ChirpOS-$VERSION-win-x64.zip" > SHA256SUMS.txt
           gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --draft \
             --title "ChirpOS $RELEASE_TAG · macOS & Windows" \
             --notes-file "$GITHUB_WORKSPACE/docs/releases/$RELEASE_TAG.md"
-          gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" ChirpOS-* SHA256SUMS.txt
+          gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" "ChirpOS-$VERSION-macOS-"*.zip "ChirpOS-$VERSION-win-arm64.zip" "ChirpOS-$VERSION-win-x64.zip" SHA256SUMS.txt
           gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+      - name: Clean up signing material
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/chirpos-signing.keychain-db" || true
+          rm -f "$RUNNER_TEMP/signing.p12" "$RUNNER_TEMP/AuthKey.p8"

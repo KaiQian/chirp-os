@@ -4,9 +4,9 @@
 
 | 平台 / Platform | 最新版本 / Latest release |
 | --- | --- |
-| Windows · Intel / AMD 64-bit | [下载 EXE · v0.3.2](https://github.com/billtt/chirp-os/releases/download/v0.3.2/ChirpOS-0.3.2-win-x64.exe) |
-| Windows · ARM64 / UTM | [下载 EXE · v0.3.2](https://github.com/billtt/chirp-os/releases/download/v0.3.2/ChirpOS-0.3.2-win-arm64.exe) |
-| macOS · Apple Silicon | [下载 ZIP · v0.3.2](https://github.com/billtt/chirp-os/releases/download/v0.3.2/ChirpOS-0.3.2-macOS-arm64.zip) |
+| Windows · Intel / AMD 64-bit | [下载 ZIP · v0.3.3](https://github.com/billtt/chirp-os/releases/download/v0.3.3/ChirpOS-0.3.3-win-x64.zip) |
+| Windows · ARM64 / UTM | [下载 ZIP · v0.3.3](https://github.com/billtt/chirp-os/releases/download/v0.3.3/ChirpOS-0.3.3-win-arm64.zip) |
+| macOS · Apple Silicon | [下载 ZIP · v0.3.3](https://github.com/billtt/chirp-os/releases/download/v0.3.3/ChirpOS-0.3.3-macOS-arm64.zip) |
 
 [所有版本 / All releases](https://github.com/billtt/chirp-os/releases) · [简体中文](#中文) · [English](#english)
 
@@ -29,13 +29,13 @@
 
 ### 开始观鸟
 
-**Windows：** 下载对应架构的 EXE，直接运行，无需安装 .NET。支持 Windows 10/11 x64 和 Windows 11 ARM64。
+**Windows：** 下载对应架构的 ZIP，解压后运行 ChirpOS.exe，无需安装 .NET。支持 Windows 10/11 x64 和 Windows 11 ARM64。
 
 **macOS：** 下载并解压 ZIP，将 `ChirpOS.app` 拖入“应用程序”后打开。下载版适用于 macOS 13 及以上的 Apple Silicon Mac。
 
 启动后稍等片刻，小鸟就会陆续飞入。点击 macOS 菜单栏或右键点击 Windows 系统托盘中的小鸟图标，即可调整设置或退出。Windows 图标可能位于托盘的隐藏图标区域。更新前请先退出正在运行的版本。
 
-应用尚未经过 macOS 公证或 Windows 发布者签名，首次打开可能遇到系统安全提示。
+macOS 版本使用 Developer ID 签名并经过 Apple 公证。Windows 版本尚未使用发布者证书签名，首次打开可能遇到系统安全提示。
 
 ### 隐私与反馈
 
@@ -57,13 +57,13 @@ ChirpOS brings pixel-art birds to your macOS or Windows desktop. They fly in fro
 
 ### Get started
 
-**Windows:** Download the EXE for your architecture and run it. No separate .NET installation is needed. Supports Windows 10/11 x64 and Windows 11 ARM64.
+**Windows:** Download the ZIP for your architecture, extract it, and run ChirpOS.exe. No separate .NET installation is needed. Supports Windows 10/11 x64 and Windows 11 ARM64.
 
 **macOS:** Extract the ZIP, move `ChirpOS.app` to Applications, and open it. The download supports Apple Silicon Macs running macOS 13 or later.
 
 Birds begin arriving shortly after launch. Use the macOS menu bar icon or right-click the Windows tray icon for settings and quit. The Windows icon may be in the hidden-icons area. Quit the running version before updating.
 
-The app is not notarized for macOS or publisher-signed for Windows, so a system security prompt may appear on first launch.
+The macOS app is Developer ID-signed and notarized by Apple. Windows builds are not publisher-signed, so a system security prompt may appear on first launch.
 
 ### Privacy & feedback
 

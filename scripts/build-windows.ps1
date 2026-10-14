@@ -12,5 +12,7 @@ try {
     Copy-Item platforms/windows/Verify-Windows.cmd "$Output/Verify-Windows.cmd"
     Copy-Item platforms/windows/README.md "$Output/README.md"
     New-Item -ItemType Directory -Force dist/releases | Out-Null
-    Copy-Item "$Output/ChirpOS.exe" "dist/releases/ChirpOS-0.3.2-$Runtime.exe" -Force
+    [xml]$Project=Get-Content platforms/windows/ChirpOS/ChirpOS.csproj
+    $Version=$Project.Project.PropertyGroup.Version
+    Compress-Archive -Path "$Output/ChirpOS.exe","$Output/LICENSE.txt","$Output/README.md","$Output/Verify-Windows.cmd" -DestinationPath "dist/releases/ChirpOS-$Version-$Runtime.zip" -CompressionLevel Optimal -Force
 } finally { Pop-Location }

@@ -19,8 +19,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <key>CFBundleDevelopmentRegion</key><string>en</string>
 <key>CFBundleLocalizations</key><array><string>en</string><string>zh-Hans</string><string>zh-Hant</string></array>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.3.2</string>
-<key>CFBundleVersion</key><string>32</string>
+<key>CFBundleShortVersionString</key><string>0.3.3</string>
+<key>CFBundleVersion</key><string>33</string>
 <key>LSMinimumSystemVersion</key><string>13.0</string>
 <key>LSUIElement</key><true/>
 <key>NSHighResolutionCapable</key><true/>
@@ -51,7 +51,11 @@ for language in en zh-Hans zh-Hant; do
     if [[ "$language" != en ]]; then name="啾啾"; fi
     printf '"CFBundleName" = "%s";\n"CFBundleDisplayName" = "%s";\n' "$name" "$name" > "$APP/Contents/Resources/$language.lproj/InfoPlist.strings"
 done
-codesign --force --sign - "$APP"
+if [[ -n "${CHIRPOS_SIGNING_IDENTITY:-}" ]]; then
+    codesign --force --sign "$CHIRPOS_SIGNING_IDENTITY" --options runtime --timestamp "$APP"
+else
+    codesign --force --sign - "$APP"
+fi
 touch "$APP"
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 if [[ -x "$LSREGISTER" ]]; then "$LSREGISTER" -f "$APP" || true; fi

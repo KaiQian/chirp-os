@@ -49,7 +49,7 @@ Requires .NET 10 SDK. Builds can run on Windows, macOS, or Linux.
 ./scripts/build-windows.sh win-arm64 win-x64
 ```
 
-输出 / Outputs: `dist/windows/<runtime>/ChirpOS.exe` and `dist/releases/*.exe`.
+输出 / Outputs: `dist/windows/<runtime>/ChirpOS.exe` and `dist/releases/*.zip`.
 
 Mac 上的 ARM64 构建还会复制到 `~/Downloads/share/ChirpOS.exe`；可用 `CHIRPOS_SHARE_DIR` 指定其他目录。
 On Mac, ARM64 builds also copy to `~/Downloads/share/ChirpOS.exe`; override with `CHIRPOS_SHARE_DIR`.
@@ -79,3 +79,21 @@ Artwork is defined in `platforms/macos/Sources/Birding/PixelArt.swift` and `Spec
 
 设置与构建缓存分开存储，清理缓存不会重置偏好。
 Settings are separate from build caches; removing caches does not reset preferences.
+
+## Signed macOS releases
+
+Set `CHIRPOS_SIGNING_IDENTITY` to the full Developer ID Application identity, then run
+`bash scripts/build.sh` and `bash scripts/notarize-macos.sh`. The latter uses the
+`chirpos-notary` keychain profile (override with `CHIRPOS_NOTARY_PROFILE`), requires
+an Accepted notarization result, staples and validates the app, then creates the release ZIP.
+Local builds without a signing identity remain ad-hoc signed.
+
+GitHub Actions requires repository variable `MACOS_SIGNING_IDENTITY` and secrets:
+`MACOS_CERTIFICATE_P12_BASE64` (certificate plus private key),
+`MACOS_CERTIFICATE_PASSWORD`, `APPLE_API_KEY_P8`, `APPLE_API_KEY_ID`,
+and `APPLE_API_ISSUER_ID`. Missing credentials stop the release.
+Never commit signing material. Configure these before using the release workflow.
+
+Windows release assets are always ZIP archives containing ChirpOS.exe, LICENSE.txt,
+README.md, and Verify-Windows.cmd. Both shell and PowerShell builds read the version
+from ChirpOS.csproj. Extract the archive before launching the executable.
