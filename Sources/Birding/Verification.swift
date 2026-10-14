@@ -1,0 +1,179 @@
+import AppKit
+import BirdingCore
+
+func saveJSON(_ value: [String:Any], to url: URL) {
+    if let data = try? JSONSerialization.data(withJSONObject: value, options: [.prettyPrinted,.sortedKeys]) { try? data.write(to:url, options:.atomic) }
+}
+
+// A second process supplies real WindowServer windows; no Accessibility permission needed.
+final class FixtureController {
+    let folder: URL
+    var host: NSWindow!
+    var cover: NSWindow!
+    var timer: Timer?
+    var slowRemaining = 0
+    var previousCommand = ""
+    init(folder: URL) { self.folder = folder }
+    func start() {
+        let visible = NSScreen.screens.first!.visibleFrame
+        let w = min(640, visible.width*0.6), h: CGFloat = 310
+        host = window(frame:CGRect(x:visible.midX-w/2,y:visible.midY-h/2,width:w,height:h),title:"Birding · Window habitat",color:NSColor(calibratedRed:0.13,green:0.22,blue:0.24,alpha:1))
+        host.orderFrontRegardless()
+        cover = window(frame:CGRect(x:host.frame.midX+14,y:host.frame.maxY-110,width:280,height:210),title:"Birding · Foreground",color:NSColor(calibratedRed:0.31,green:0.24,blue:0.22,alpha:1))
+        saveJSON(["host":host.windowNumber,"cover":cover.windowNumber,"pid":ProcessInfo.processInfo.processIdentifier], to:folder.appendingPathComponent("fixture.json"))
+        timer = Timer.scheduledTimer(withTimeInterval:1.0/30,repeats:true) { [weak self] _ in self?.tick() }
+    }
+    func window(frame: CGRect,title:String,color:NSColor) -> NSWindow {
+        let window = NSWindow(contentRect:frame,styleMask:[.titled,.closable,.resizable,.miniaturizable],backing:.buffered,defer:false)
+        window.title = title; window.backgroundColor = color; window.isReleasedWhenClosed = false
+        let label = NSTextField(wrappingLabelWithString: title.contains("Foreground") ? "FOREGROUND\n\nThis window should hide the bird.\n\nDrag me over its perch." : "BIRDING  /  红耳鹎\n\nA little life between your windows.\n\nMove this window slowly: the bird rides along.\nMove it quickly: the bird takes flight.")
+        label.font = .systemFont(ofSize:18,weight:.medium); label.textColor = .white
+        label.frame = CGRect(x:28,y:30,width:frame.width-56,height:frame.height-65)
+        label.autoresizingMask = [.width,.height]; window.contentView?.addSubview(label)
+        return window
+    }
+    func tick() {
+        if let command = try? String(contentsOf:folder.appendingPathComponent("command"),encoding:.utf8), command != previousCommand {
+            previousCommand = command
+            switch command {
+            case "slow": slowRemaining = 30
+            case "cover":
+                cover.setFrameOrigin(CGPoint(x:host.frame.midX+4,y:host.frame.maxY-100)); cover.orderFrontRegardless()
+            case "uncover": cover.orderOut(nil)
+            case "fast": host.setFrameOrigin(CGPoint(x:host.frame.minX+150,y:host.frame.minY))
+            case "hide": host.orderOut(nil)
+            case "show": host.orderFrontRegardless()
+            case "quit": NSApp.terminate(nil)
+            default: break
+            }
+        }
+        if slowRemaining > 0 { host.setFrameOrigin(CGPoint(x:host.frame.minX+3,y:host.frame.minY)); slowRemaining -= 1 }
+    }
+}
+
+final class IntegrationCheck {
+    unowned let desktop: DesktopController
+    let folder: URL
+    var results: [String:Bool] = [:]
+    var hostID: UInt32 = 0
+    var fixturePID: Int32 = 0
+    var initial = CGPoint.zero
+    var initialFrontPID: Int32 = 0
+    var bird: Bird { desktop.birds[0] }
+    init(desktop: DesktopController, folder:URL) { self.desktop = desktop; self.folder = folder }
+    func after(_ seconds: Double,_ action: @escaping () -> Void) { DispatchQueue.main.asyncAfter(deadline:.now()+seconds,execute:action) }
+    func command(_ value:String) { try? value.write(to:folder.appendingPathComponent("command"),atomically:true,encoding:.utf8) }
+    func host() -> Surface? { desktop.surfaces.first{$0.id == hostID} }
+    func start() {
+        guard let data = try? Data(contentsOf:folder.appendingPathComponent("fixture.json")),
+              let json = try? JSONSerialization.jsonObject(with:data) as? [String:Any],
+              let id = json["host"] as? UInt32, let pid = json["pid"] as? Int32 else { finish(error:"fixture metadata missing"); return }
+        hostID = id; fixturePID = pid
+        initialFrontPID = NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0
+        // The normal app starts empty; the fixture owns its single deterministic bird.
+        desktop.automaticPopulation = false
+        desktop.birds = [Bird(position:CGPoint(x:400,y:300),fraction:0.5)]
+        after(0.6) {
+            self.results["readsOtherProcessWindow"] = self.host()?.pid == self.fixturePID && self.fixturePID != ProcessInfo.processInfo.processIdentifier
+            guard let host = self.host() else { self.finish(error:"WindowServer did not expose fixture"); return }
+            self.bird.fraction = 0.5; self.bird.perch(on:host); self.bird.perchDuration = 999
+            self.initial = self.bird.position
+            self.results["overlayNonactivatingAndClickThrough"] = self.desktop.panels.allSatisfy{$0.ignoresMouseEvents && !$0.canBecomeKey && !$0.canBecomeMain}
+            self.results["keepsOtherAppFocused"] = self.initialFrontPID == (NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0)
+            self.command("slow")
+        }
+        after(2.3) {
+            self.results["slowMoveFollows"] = self.bird.state == .perched && abs(self.bird.position.x-self.initial.x-90)<2 && self.bird.followedDistance>85
+            self.results["feetStayOnWindowEdge"] = abs(self.bird.position.y-(self.host()?.rect.minY ?? -100))<0.1
+            self.command("cover")
+        }
+        after(3.0) {
+            let blockers = self.bird.blockers(in:self.desktop.surfaces)
+            let bbox = self.desktop.bounds(of:self.bird)
+            let pieces = Geometry.visiblePieces(bbox,blockers:blockers)
+            let visibleArea = pieces.reduce(CGFloat(0)){$0+$1.width*$1.height}
+            self.results["frontWindowMasksPartOfBird"] = visibleArea>0 && visibleArea<bbox.width*bbox.height && blockers.contains{$0.intersects(bbox)}
+            self.saveMaskedBird()
+            self.saveLayerSnapshot()
+            self.command("uncover")
+        }
+        after(3.8) {
+            self.results["zOrderRefreshesWhenCoverHidden"] = !self.bird.blockers(in:self.desktop.surfaces).contains{$0.intersects(self.desktop.bounds(of:self.bird))}
+            self.command("fast")
+        }
+        after(4.4) {
+            self.results["fastMoveStartles"] = self.bird.state == .flying && self.bird.startledCount == 1 && self.bird.hostID == nil
+            if let host = self.host() {
+                self.bird.fly(to:CGPoint(x:Geometry.perchX(0.5,rect:host.rect),y:host.rect.minY),host:host,duration:0.8,arc:40)
+            }
+        }
+        after(5.0) { self.results["playsLandingState"] = self.bird.state == .landing }
+        after(5.9) {
+            self.results["flightLandsBackOnWindow"] = self.bird.state == .perched && self.bird.landedCount>0
+            self.command("hide")
+        }
+        after(6.4) {
+            self.results["hiddenHostReleasesBird"] = self.bird.state == .flying && self.bird.hostID == nil && self.bird.startledCount == 2
+            self.finish(error:nil)
+        }
+    }
+    func saveMaskedBird() {
+        let bbox = desktop.bounds(of:bird)
+        let w = Int(bbox.width), h = Int(bbox.height)
+        let ctx = CGContext(data:nil,width:w,height:h,bitsPerComponent:8,bytesPerRow:w*4,space:CGColorSpaceCreateDeviceRGB(),bitmapInfo:CGImageAlphaInfo.premultipliedLast.rawValue)!
+        ctx.translateBy(x:0,y:CGFloat(h)); ctx.scaleBy(x:1,y:-1)
+        ctx.translateBy(x:-bbox.minX,y:-bbox.minY)
+        let blockers = bird.blockers(in:desktop.surfaces)
+        ctx.clip(to:Geometry.visiblePieces(bbox,blockers:blockers))
+        desktop.art.draw(name:bird.frameName,at:bird.position,scale:desktop.scale,right:bird.facingRight,context:ctx)
+        let image = ctx.makeImage()!
+        let rep = NSBitmapImageRep(cgImage:image)
+        try? rep.representation(using:.png,properties:[:])!.write(to:folder.appendingPathComponent("occlusion.png"))
+        var opaque = 0, leaked = 0
+        for y in 0..<h { for x in 0..<w {
+            // NSBitmapImageRep uses top-down image coordinates after the context flip.
+            let alpha = rep.colorAt(x:x,y:y)?.alphaComponent ?? 0
+            if alpha > 0 {
+                opaque += 1
+                let point = CGPoint(x:bbox.minX+CGFloat(x)+0.5,y:bbox.minY+CGFloat(y)+0.5)
+                if blockers.contains(where:{$0.contains(point)}) { leaked += 1 }
+            }
+        } }
+        results["renderedOcclusionHasNoPixelLeaks"] = opaque > 0 && leaked == 0
+    }
+    func saveLayerSnapshot() {
+        guard let view = desktop.views.first(where:{$0.desktopRect.contains(bird.position)}),let root = view.layer else { return }
+        view.updateSprites()
+        let w = Int(view.bounds.width), h = Int(view.bounds.height)
+        let ctx = CGContext(data:nil,width:w,height:h,bitsPerComponent:8,bytesPerRow:w*4,space:CGColorSpaceCreateDeviceRGB(),bitmapInfo:CGImageAlphaInfo.premultipliedLast.rawValue)!
+        // CALayer.render uses Quartz bottom-up coordinates, unlike our desktop view.
+        ctx.translateBy(x:0,y:CGFloat(h)); ctx.scaleBy(x:1,y:-1)
+        root.render(in:ctx)
+        saveJSON(["view":NSStringFromRect(view.bounds),"root":NSStringFromRect(root.bounds),"layers":(root.sublayers ?? []).map{["frame":NSStringFromRect($0.frame),"mask":NSStringFromRect($0.mask?.bounds ?? .zero),"hidden":$0.isHidden] as [String:Any]}],to:folder.appendingPathComponent("layer-geometry.json"))
+        if let full = ctx.makeImage() { try? NSBitmapImageRep(cgImage:full).representation(using:.png,properties:[:])!.write(to:folder.appendingPathComponent("full-layer.png")) }
+        let bbox = desktop.bounds(of:bird)
+        let crop = bbox.offsetBy(dx:-view.desktopRect.minX,dy:-view.desktopRect.minY).integral
+        guard let image = ctx.makeImage()?.cropping(to:crop) else { return }
+        let rep = NSBitmapImageRep(cgImage:image)
+        try? rep.representation(using:.png,properties:[:])!.write(to:folder.appendingPathComponent("actual-layer.png"))
+        var opaque = 0, leaked = 0
+        let blockers = bird.blockers(in:desktop.surfaces)
+        for y in 0..<image.height { for x in 0..<image.width {
+            if (rep.colorAt(x:x,y:y)?.alphaComponent ?? 0)>0 {
+                opaque += 1
+                let p = CGPoint(x:crop.minX+view.desktopRect.minX+CGFloat(x)+0.5,y:crop.minY+view.desktopRect.minY+CGFloat(y)+0.5)
+                if blockers.contains(where:{$0.contains(p)}) { leaked += 1 }
+            }
+        } }
+        results["actualSpriteLayerHasVisiblePixelsAndNoLeaks"] = opaque>0 && leaked == 0
+    }
+    func finish(error:String?) {
+        desktop.writeDiagnostics(to:folder.appendingPathComponent("diagnostics.json").path)
+        let passed = error == nil && !results.isEmpty && results.values.allSatisfy{$0}
+        saveJSON(["passed":passed,"checks":results,"error":error ?? "","os":ProcessInfo.processInfo.operatingSystemVersionString],to:folder.appendingPathComponent("report.json"))
+        command("quit")
+        print("Desktop integration: \(passed ? "PASS" : "FAIL") — \(results.count) checks")
+        fflush(stdout)
+        exit(passed ? 0 : 1)
+    }
+}
