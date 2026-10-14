@@ -6,18 +6,18 @@ public enum SpeciesID: String, Codable, CaseIterable {
 public struct SpeciesProfile: Codable, Equatable {
     public let id: SpeciesID
     public let name: String
-    public let adultLengthCM: Double
+    public var adultLengthCM: Double
     public let weight: Double
-    public let flapFPS: Double
-    public let speed: Double
-    public let perchMin: Double
-    public let perchMax: Double
+    public var flapFPS: Double
+    public var speed: Double
+    public var perchMin: Double
+    public var perchMax: Double
     public let weightBasis: String
     // All sprites share a calibrated 46-pixel bill-to-tail flight length.
     public var relativeScale: Double { adultLengthCM / 19 }
 }
 public struct SpeciesCatalog: Codable {
-    public let species: [SpeciesProfile]
+    public var species: [SpeciesProfile]
     public static let standard: SpeciesCatalog = {
         let packaged = Bundle.main.resourceURL?.appendingPathComponent("Birding_BirdingCore.bundle/species.json")
         let url = packaged.flatMap { FileManager.default.fileExists(atPath:$0.path) ? $0 : nil }

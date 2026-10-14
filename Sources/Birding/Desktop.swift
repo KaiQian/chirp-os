@@ -62,21 +62,37 @@ final class DesktopView: NSView {
 final class DesktopController: NSObject {
     let art = BirdArt()
     let arts = Dictionary(uniqueKeysWithValues: SpeciesID.allCases.map { ($0, BirdArt(species:$0)) })
-    var catalog = SpeciesCatalog.standard
-    let speciesConfigURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Birding/species.json")
+    var settings = BirdSettings()
+    var catalog: SpeciesCatalog { settings.catalog }
+    var preferences = UserDefaults.standard
+    var language = AppLanguage.chinese
+    var settingsWindow: SpeciesSettingsWindow?
+    var settingsURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Birding/settings.json")
+    var legacyURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Birding/species.json")
+    func t(_ zh:String,_ en:String) -> String { language.text(zh,en) }
     func spriteScale(for bird: Bird) -> CGFloat { scale * bird.profile.relativeScale }
-    func loadSpeciesConfig() throws {
-        if !FileManager.default.fileExists(atPath:speciesConfigURL.path) {
-            try FileManager.default.createDirectory(at:speciesConfigURL.deletingLastPathComponent(),withIntermediateDirectories:true)
-            let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted,.sortedKeys]
-            try encoder.encode(SpeciesCatalog.standard).write(to:speciesConfigURL,options:.atomic)
-        }
-        catalog = try SpeciesCatalog.decode(Data(contentsOf:speciesConfigURL))
+    func loadSpeciesConfig() throws { settings = try BirdSettings.load(from:settingsURL,legacyURL:legacyURL) }
+    func applySettings(_ value:BirdSettings) throws {
+        try value.save(to:settingsURL)
+        settings = value
     }
-    @objc func openSpeciesConfig() { NSWorkspace.shared.open(speciesConfigURL) }
-    @objc func reloadSpeciesConfig() {
-        do { try loadSpeciesConfig(); statusLine.title = "鸟种配置已更新，随后飞入的小鸟使用新配置" }
-        catch { let alert = NSAlert(); alert.messageText = "鸟种配置未载入"; alert.informativeText = error.localizedDescription; alert.runModal() }
+    @objc func showSpeciesSettings() {
+        if let settingsWindow, settingsWindow.window?.isVisible == true {
+            settingsWindow.window?.makeKeyAndOrderFront(nil)
+        } else {
+            settingsWindow = SpeciesSettingsWindow(desktop:self)
+            settingsWindow?.showWindow(nil)
+        }
+        NSApp.activate(ignoringOtherApps:true)
+    }
+    @objc func toggleLanguage() {
+        language = language == .chinese ? .english : .chinese
+        preferences.set(language.rawValue,forKey:"appLanguage")
+        makeMenu(); settingsWindow?.relocalize()
+    }
+    func updateStatusLine() {
+        statusLine.title = t("桌面鸟群 · \(residentCount) 只 · \(birds.count-residentCount) 只正在离开",
+                             "Birds · \(residentCount) visiting · \(birds.count-residentCount) departing")
     }
     var birds: [Bird] = []
     var surfaces: [Surface] = [] // Front to back, exactly as supplied by WindowServer.
@@ -104,6 +120,7 @@ final class DesktopController: NSObject {
     var displayRects: [CGRect] { NSScreen.screens.map { Geometry.quartz($0.frame, primaryHeight: primaryHeight) } }
     var residentCount: Int { birds.filter { !$0.isDeparting }.count }
     func start() {
+        language = AppLanguage(rawValue:preferences.string(forKey:"appLanguage") ?? "zh") ?? .chinese
         if let saved = PopulationRange(lower: UserDefaults.standard.integer(forKey:"populationLower"), upper: UserDefaults.standard.integer(forKey:"populationUpper")) {
             population = Population(range:saved)
         }
@@ -195,7 +212,7 @@ final class DesktopController: NSObject {
     func bringInBird() {
         guard let point = Migration.outsidePoint(screens:displayRects,right:Bool.random(),fraction:CGFloat.random(in:0.2...0.75),margin:80*scale*3+20) else { return }
         lastArrivalPosition = point
-        let bird = Bird(position:point,fraction:CGFloat.random(in:0.12...0.88),profile:catalog.choose())
+        let bird = Bird(position:point,fraction:CGFloat.random(in:0.12...0.88),profile:catalog.profile(settings.probabilities.choose()))
         birds.append(bird); arrivalCount += 1
         chooseDestination(bird,entering:true)
     }
@@ -232,7 +249,7 @@ final class DesktopController: NSObject {
         for view in views { view.updateSprites() }
         if now-lastDiagnostic > 1 {
             lastDiagnostic = now
-            statusLine.title = "桌面鸟群 · \(residentCount) 只 · \(birds.count-residentCount) 只正在离开"
+            updateStatusLine()
             if let diagnosticPath { writeDiagnostics(to: diagnosticPath) }
         }
     }
@@ -248,41 +265,51 @@ final class DesktopController: NSObject {
         if let data = try? JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted,.sortedKeys]) { try? data.write(to: URL(fileURLWithPath:path), options: .atomic) }
     }
     func makeMenu() {
-        status = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        if status == nil { status = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength) }
         let icon = NSImage(cgImage: art.frames["stand"]!, size: NSSize(width: 24,height: 24))
-        status.button?.image = icon; status.button?.toolTip = "Birding · 桌面观鸟"
+        status.button?.image = icon; status.button?.toolTip = t("Birding · 桌面观鸟","Birding · Desktop Birdwatching")
         let menu = NSMenu()
-        statusLine = NSMenuItem(title: "桌面鸟群 · 等待第一只鸟飞来", action: nil, keyEquivalent: "")
+        statusLine = NSMenuItem(title: t("桌面鸟群 · 等待第一只鸟飞来","Birds · Waiting for the first arrival"), action: nil, keyEquivalent: "")
         menu.addItem(statusLine); menu.addItem(.separator())
-        add(menu,"暂停动画",#selector(togglePause),"p")
-        add(menu,"让小鸟飞一会儿",#selector(scatter),"f")
-        add(menu,"大小：1× / 1.5×",#selector(toggleScale),"")
+        add(menu,paused ? t("继续动画","Resume animation") : t("暂停动画","Pause animation"),#selector(togglePause),"p")
+        add(menu,t("让小鸟飞一会儿","Let the birds fly"),#selector(scatter),"f")
+        add(menu,t("大小：1× / 1.5×","Size: 1× / 1.5×"),#selector(toggleScale),"")
         populationItem = NSMenuItem(title:"",action:nil,keyEquivalent:"")
         populationMenu = NSMenu()
-        for (index,label) in ["3–5 只","8–12 只","15–20 只"].enumerated() {
+        for (index,label) in [t("3–5 只","3–5 birds"),t("8–12 只","8–12 birds"),t("15–20 只","15–20 birds")].enumerated() {
             let item = NSMenuItem(title:label,action:#selector(selectPopulation(_:)),keyEquivalent:"")
             item.target = self; item.tag = index; populationMenu.addItem(item)
         }
         populationMenu.addItem(.separator())
-        add(populationMenu,"自定义范围…",#selector(customPopulation),"")
+        add(populationMenu,t("自定义范围…","Custom range…"),#selector(customPopulation),"")
         populationItem.submenu = populationMenu; menu.addItem(populationItem)
         refreshPopulationMenu()
         menu.addItem(.separator())
-        add(menu,"编辑鸟种配置…",#selector(openSpeciesConfig),"")
-        add(menu,"重新载入鸟种配置",#selector(reloadSpeciesConfig),"")
-        add(menu,"打开项目说明",#selector(openReadme),"")
-        add(menu,"退出 Birding",#selector(quit),"q")
+        add(menu,t("鸟种设置…","Bird settings…"),#selector(showSpeciesSettings),"")
+        add(menu,language.switchTitle,#selector(toggleLanguage),"")
+        add(menu,t("打开项目说明","Open README"),#selector(openReadme),"")
+        add(menu,t("退出 Birding","Quit Birding"),#selector(quit),"q")
         status.menu = menu
+        updateStatusLine()
+        let main=NSMenu()
+        let application=NSMenuItem();main.addItem(application);application.submenu=NSMenu()
+        add(application.submenu!,t("退出 Birding","Quit Birding"),#selector(quit),"q")
+        let editItem=NSMenuItem(title:t("编辑","Edit"),action:nil,keyEquivalent:"")
+        let edit=NSMenu(title:editItem.title);editItem.submenu=edit;main.addItem(editItem)
+        for (title,action,key) in [(t("撤销","Undo"),"undo:","z"),(t("剪切","Cut"),"cut:","x"),(t("复制","Copy"),"copy:","c"),(t("粘贴","Paste"),"paste:","v"),(t("全选","Select All"),"selectAll:","a")] {
+            edit.addItem(NSMenuItem(title:title,action:Selector(action),keyEquivalent:key))
+        }
+        NSApp.mainMenu=main
     }
     func add(_ menu: NSMenu,_ title: String,_ action: Selector,_ key: String) {
         let item = NSMenuItem(title:title,action:action,keyEquivalent:key); item.target = self; menu.addItem(item)
     }
-    @objc func togglePause(_ sender: NSMenuItem) { paused.toggle(); sender.title = paused ? "继续动画" : "暂停动画" }
+    @objc func togglePause(_ sender: NSMenuItem) { paused.toggle(); sender.title = paused ? t("继续动画","Resume animation") : t("暂停动画","Pause animation") }
     @objc func scatter() { for bird in birds where !bird.isDeparting { chooseDestination(bird) } }
     @objc func toggleScale() { scale = scale == 1 ? 1.5 : 1; for v in views { v.needsDisplay = true } }
     let populationPresets = [PopulationRange.standard,PopulationRange(lower:8,upper:12)!,PopulationRange(lower:15,upper:20)!]
     func refreshPopulationMenu() {
-        populationItem.title = "鸟群范围：\(population.range.lower)–\(population.range.upper) 只"
+        populationItem.title = t("鸟群范围：\(population.range.lower)–\(population.range.upper) 只","Population: \(population.range.lower)–\(population.range.upper) birds")
         for item in populationMenu.items where item.action == #selector(selectPopulation(_:)) {
             item.state = populationPresets[item.tag] == population.range ? .on : .off
         }
@@ -296,13 +323,13 @@ final class DesktopController: NSObject {
     @objc func selectPopulation(_ sender: NSMenuItem) { applyPopulationRange(populationPresets[sender.tag]) }
     @objc func customPopulation() {
         let alert = NSAlert()
-        alert.messageText = "设置鸟群数量范围"
-        alert.informativeText = "输入最少和最多数量（1–50）。小鸟会陆续飞入或飞走，逐渐达到这个范围。"
-        alert.addButton(withTitle:"保存"); alert.addButton(withTitle:"取消")
+        alert.messageText = t("设置鸟群数量范围","Set population range")
+        alert.informativeText = t("输入最少和最多数量（1–50）。小鸟会陆续飞入或飞走，逐渐达到这个范围。","Enter minimum and maximum counts (1–50). Birds will gradually arrive or leave to reach this range.")
+        alert.addButton(withTitle:t("保存","Save")); alert.addButton(withTitle:t("取消","Cancel"))
         let form = NSView(frame:NSRect(x:0,y:0,width:280,height:62))
         let lower = NSTextField(string:String(population.range.lower))
         let upper = NSTextField(string:String(population.range.upper))
-        for (index,pair) in [("最少",lower),("最多",upper)].enumerated() {
+        for (index,pair) in [(t("最少","Minimum"),lower),(t("最多","Maximum"),upper)].enumerated() {
             let label = NSTextField(labelWithString:pair.0)
             label.frame = NSRect(x:index*140,y:36,width:120,height:20)
             pair.1.frame = NSRect(x:index*140,y:4,width:120,height:26)
@@ -316,7 +343,7 @@ final class DesktopController: NSObject {
                let range = PopulationRange(lower:lo,upper:hi) {
                 applyPopulationRange(range); return
             }
-            alert.informativeText = "请输入 1–50 的整数，最多数量不能小于最少数量。"
+            alert.informativeText = t("请输入 1–50 的整数，最多数量不能小于最少数量。","Enter integers from 1 to 50. Maximum must be at least minimum.")
         }
     }
     @objc func openReadme() {
