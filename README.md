@@ -6,6 +6,26 @@
 
 [简体中文](#中文) | [English](#english)
 
+支持 macOS 和 Windows。macOS 使用 Swift/AppKit；Windows 使用 C#、WinForms 与 Win32。
+Supports macOS and Windows, with native desktop integration on each platform.
+
+- **macOS**：下文 / See below.
+- **Windows**：[运行、构建与测试 / Run, build and test](platforms/windows/README.md).
+- **共用素材 / Shared assets**：[资源说明 / Resource guide](shared/README.md).
+
+```text
+platforms/macos/    Swift 应用、行为核心与测试 / Swift app, core and tests
+platforms/windows/  C# 应用、行为核心与测试 / C# app, core and tests
+shared/             鸟种定义、像素图集、Windows 图标 / Species, atlases and Windows icon
+scripts/            macOS / Windows 构建和验证 / Build and verification
+Assets/             文档预览与图标源图 / Documentation previews and icon artwork
+dist/               本机构建产物（不提交）/ Local build outputs (ignored)
+```
+
+原有 `./scripts/build.sh`、`run.sh`、`test.sh` 继续用于 macOS；Windows 使用 `build-windows.sh` 或 `build-windows.ps1`。
+The existing macOS entry points remain unchanged. Use `build-windows.sh` or `build-windows.ps1` for Windows.
+
+
 ## 中文
 
 啾啾是一款使用 Swift / AppKit 开发的 macOS 原生桌面观鸟应用。七种上海鸟类陆续从屏幕外飞入，在应用窗口之间飞行，落在顶沿，眨眼、呼吸、整理羽毛。缓慢移动承载窗口时随行，快速移动时受惊飞走。屏幕叠加层透明、不抢焦点、鼠标穿透；菜单栏的小鸟图标提供控制。
@@ -38,7 +58,7 @@ cd ~/projects/birding
 
 ### 动画与美术
 
-所有素材为本项目原创的 48×48 像素图案，源码在 `Sources/Birding/PixelArt.swift` 与 `Sources/Birding/SpeciesArt.swift`，使用有限调色板。红耳鹎特征包括向上羽冠、黑色头部、白颊、红耳斑、棕色层叠飞羽、红色尾下覆羽与浅色长尾端。
+所有素材为本项目原创的 48×48 像素图案，源码在 `platforms/macos/Sources/Birding/PixelArt.swift` 与 `platforms/macos/Sources/Birding/SpeciesArt.swift`，使用有限调色板。红耳鹎特征包括向上羽冠、黑色头部、白颊、红耳斑、棕色层叠飞羽、红色尾下覆羽与浅色长尾端。
 
 - 飞行：8 个独立全身姿态。红耳鹎每秒 20 帧，其余鸟种采用各自配置的帧率。横向伸展身体、前倾与起伏、收脚、尾羽开合；远侧翅膀在身体后方，近侧大幅下拍并在回收时折叠。
 - 着陆：3 帧收翅缓冲，约 0.42 秒。
@@ -89,7 +109,7 @@ cd ~/projects/birding
 
 ### 代码索引
 
-除另行注明外，以下路径均相对于 `Sources/`。
+除另行注明外，以下路径均相对于 `platforms/macos/Sources/`。
 
 | 路径 | 用途 |
 |---|---|
@@ -107,7 +127,7 @@ cd ~/projects/birding
 | `Birding/SpeciesPreview.swift` | 鸟种比例总览、动画导出与图像检查 |
 | `Birding/Verification.swift` | 独立窗口夹具与桌面集成验证 |
 | `Birding/PopulationVerification.swift` | 应用内鸟群生命周期检查 |
-| `Tests/BirdingCoreTests/`（项目根目录下） | 确定性核心回归测试 |
+| `platforms/macos/Tests/BirdingCoreTests/`（项目根目录下） | 确定性核心回归测试 |
 
 ### Apple API 参考
 
@@ -188,7 +208,7 @@ cd ~/projects/birding
 
 四种有同口径数据的鸟仍以 18647:17136:15536:12697 的观测数量比例生成默认概率。红耳鹎、鹊鸲和棕背伯劳的默认值包含估计，因此这些是参考上海常见程度的游戏入场概率，不是全上海真实种群概率。屏幕上的瞬时比例还受不同停留时间影响。
 
-应用自动保存在 `~/Library/Application Support/Birding/settings.json`。首次使用新界面时，若仅有旧版 `species.json`，会读取旧参数，并将原权重归一化为百分比；保存新设置不会改写旧文件。内置鸟种定义仍位于 `Sources/BirdingCore/Resources/species.json`，仅供开发维护。设置校验或写入失败时，已生效的配置保持不变；启动读取失败时记录日志并采用默认值，不覆盖损坏文件。
+应用自动保存在 `~/Library/Application Support/Birding/settings.json`。首次使用新界面时，若仅有旧版 `species.json`，会读取旧参数，并将原权重归一化为百分比；保存新设置不会改写旧文件。内置鸟种定义仍位于 `platforms/macos/Sources/BirdingCore/Resources/species.json`，仅供开发维护。设置校验或写入失败时，已生效的配置保持不变；启动读取失败时记录日志并采用默认值，不覆盖损坏文件。
 
 #### 预览与验证
 
@@ -253,7 +273,7 @@ Window metadata is polled at approximately 30 Hz to follow dragging, so the impl
 
 ### Animation and artwork
 
-All artwork consists of original 48×48 pixel drawings, defined in `Sources/Birding/PixelArt.swift` and `Sources/Birding/SpeciesArt.swift`, using limited palettes. Red-whiskered Bulbul retains its pointed crest, black head, white cheek, red ear patch, layered brown flight feathers, red vent, and pale tail tips. The other species have separate head, bill, wing marking, and tail geometry.
+All artwork consists of original 48×48 pixel drawings, defined in `platforms/macos/Sources/Birding/PixelArt.swift` and `platforms/macos/Sources/Birding/SpeciesArt.swift`, using limited palettes. Red-whiskered Bulbul retains its pointed crest, black head, white cheek, red ear patch, layered brown flight feathers, red vent, and pale tail tips. The other species have separate head, bill, wing marking, and tail geometry.
 
 - Flight: eight full-body poses, with a horizontal body, pitch and bob, tucked feet, tail movement, and near/far wings. Red-whiskered Bulbul plays at 20 frames per second; other species use their configured rates.
 - Landing: three wing-folding frames over approximately 0.42 seconds.
@@ -304,7 +324,7 @@ Quit stops polling. Sleep stops the timer, and wake restarts it. Independent Cor
 
 ### Source map
 
-All paths below are relative to `Sources/` unless otherwise noted.
+All paths below are relative to `platforms/macos/Sources/` unless otherwise noted.
 
 | Path | Purpose |
 |---|---|
@@ -322,7 +342,7 @@ All paths below are relative to `Sources/` unless otherwise noted.
 | `Birding/SpeciesPreview.swift` | Species comparison, animation exports, and image checks |
 | `Birding/Verification.swift` | Independent window fixture and desktop integration checks |
 | `Birding/PopulationVerification.swift` | Application-level population lifecycle checks |
-| `Tests/BirdingCoreTests/` (project root) | Deterministic core regression tests |
+| `platforms/macos/Tests/BirdingCoreTests/` (project root) | Deterministic core regression tests |
 
 ### Apple API references
 
@@ -402,7 +422,7 @@ The **Size & behavior** tab edits adult length (10–40 cm), wingbeats (0.5–7.
 
 Default probabilities retain the observation-count ratio of 18647:17136:15536:12697 for the four comparable species. Red-whiskered Bulbul, Oriental Magpie-Robin, and Long-tailed Shrike include estimates. These are game arrival probabilities informed by Shanghai observations, not population estimates. Different perch durations also affect the on-screen mix.
 
-The app saves automatically when you choose Save & Apply, using `~/Library/Application Support/Birding/settings.json`. If only the old `species.json` exists on first use, its parameters are imported and weights normalized into percentages. Saving new settings leaves the old file intact. `Sources/BirdingCore/Resources/species.json` remains the bundled definition for development. Failed validation or writing preserves the active settings; a startup read failure logs the issue and uses defaults without overwriting the damaged file.
+The app saves automatically when you choose Save & Apply, using `~/Library/Application Support/Birding/settings.json`. If only the old `species.json` exists on first use, its parameters are imported and weights normalized into percentages. Saving new settings leaves the old file intact. `platforms/macos/Sources/BirdingCore/Resources/species.json` remains the bundled definition for development. Failed validation or writing preserves the active settings; a startup read failure logs the issue and uses defaults without overwriting the damaged file.
 
 #### Preview and validation
 

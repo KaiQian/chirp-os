@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType><TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms><EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
+    <ApplicationManifest>app.manifest</ApplicationManifest><ApplicationIcon>../../../shared/AppIcon.ico</ApplicationIcon>
+    <Version>0.3.1</Version><AssemblyName>ChirpOS</AssemblyName><Product>ChirpOS</Product>
+    <PublishSingleFile>true</PublishSingleFile><SelfContained>true</SelfContained>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract><PublishTrimmed>false</PublishTrimmed>
+    <DebugType>none</DebugType><DebugSymbols>false</DebugSymbols>
+  </PropertyGroup>
+  <ItemGroup><ProjectReference Include="../ChirpOS.Core/ChirpOS.Core.csproj" />
+    <EmbeddedResource Include="../../../shared/species.json" LogicalName="species.json" />
+    <EmbeddedResource Include="../../../shared/art/*" LogicalName="art/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="../../../shared/AppIcon.ico" LogicalName="AppIcon.ico" />
+  </ItemGroup>
+</Project>

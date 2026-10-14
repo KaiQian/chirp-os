@@ -1,0 +1,29 @@
+{
+  "footAnchor" : [
+    29,
+    39
+  ],
+  "frames" : [
+    "stand",
+    "breathe",
+    "blink",
+    "preen0",
+    "preen1",
+    "land0",
+    "land1",
+    "land2",
+    "fly0",
+    "fly1",
+    "fly2",
+    "fly3",
+    "fly4",
+    "fly5",
+    "fly6",
+    "fly7",
+    "idle0",
+    "idle1"
+  ],
+  "frameSize" : 48,
+  "schemaVersion" : 1,
+  "source" : "platforms\/macos\/Sources\/Birding\/{PixelArt,SpeciesArt}.swift"
+}
