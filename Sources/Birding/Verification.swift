@@ -125,7 +125,7 @@ final class IntegrationCheck {
         ctx.translateBy(x:-bbox.minX,y:-bbox.minY)
         let blockers = bird.blockers(in:desktop.surfaces)
         ctx.clip(to:Geometry.visiblePieces(bbox,blockers:blockers))
-        desktop.art.draw(name:bird.frameName,at:bird.position,scale:desktop.scale,right:bird.facingRight,context:ctx)
+        desktop.arts[bird.profile.id]!.draw(name:bird.frameName,at:CGPoint(x:bird.position.x,y:bird.position.y+bird.hopOffset*desktop.spriteScale(for:bird)),scale:desktop.spriteScale(for:bird),right:bird.facingRight,context:ctx)
         let image = ctx.makeImage()!
         let rep = NSBitmapImageRep(cgImage:image)
         try? rep.representation(using:.png,properties:[:])!.write(to:folder.appendingPathComponent("occlusion.png"))

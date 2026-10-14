@@ -1,5 +1,6 @@
 import AppKit
 import ImageIO
+import BirdingCore
 
 // Original 48×48 pixel drawings. Integer geometry, 17-color palette, no smoothing.
 // Foot anchor is (29, 39) in every frame; animation never makes a perched bird skate.
@@ -13,8 +14,9 @@ struct PixelCanvas {
         "gray":0xB9B6A7FF, "red":0xD94B47FF, "bright":0xFF7861FF,
         "wine":0x8E343DFF, "feet":0xA78C7AFF, "eye":0x090E18FF,
         "shine":0xFFFFFFFF, "beak":0x555960FF]
+    var colours = Self.palette
     mutating func dot(_ x: Int, _ y: Int, _ color: String) {
-        if (0..<48).contains(x) && (0..<48).contains(y) { pixels[y*48+x] = Self.palette[color]! }
+        if (0..<48).contains(x) && (0..<48).contains(y) { pixels[y*48+x] = colours[color]! }
     }
     mutating func box(_ x: Int, _ y: Int, _ w: Int, _ h: Int, _ c: String) {
         for py in y..<(y+h) { for px in x..<(x+w) { dot(px, py, c) } }
@@ -43,9 +45,15 @@ struct PixelCanvas {
 }
 
 final class BirdArt {
-    static let names = ["stand","breathe","blink","preen0","preen1","land0","land1","land2","fly0","fly1","fly2","fly3","fly4","fly5","fly6","fly7"]
+    static let names = ["stand","breathe","blink","preen0","preen1","land0","land1","land2","fly0","fly1","fly2","fly3","fly4","fly5","fly6","fly7","idle0","idle1"]
     let frames: [String: CGImage]
-    init() { frames = Dictionary(uniqueKeysWithValues: Self.names.map { ($0, Self.make($0).image) }) }
+    let species: SpeciesID
+    init(species: SpeciesID = .redWhiskeredBulbul) {
+        self.species = species
+        frames = Dictionary(uniqueKeysWithValues: Self.names.map {
+            ($0, species == .redWhiskeredBulbul ? Self.make($0).image : SpeciesArt.make($0,species:species).image)
+        })
+    }
     static func make(_ name: String) -> PixelCanvas {
         if name.hasPrefix("fly"), let phase = Int(name.dropFirst(3)) { return flight(phase) }
         var c = PixelCanvas()
@@ -242,7 +250,7 @@ final class BirdArt {
             let rep = NSBitmapImageRep(cgImage: image)
             try rep.representation(using: .png, properties: [:])!.write(to: folder.appendingPathComponent(name+".png"))
         }
-        let width = 1152, height = 430
+        let width = 1152, height = 640
         let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height, bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
         let graphics = NSGraphicsContext(bitmapImageRep: rep)!
         NSGraphicsContext.saveGraphicsState(); NSGraphicsContext.current = graphics

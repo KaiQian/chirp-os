@@ -10,6 +10,10 @@ if let path = argument("--export-art") {
     do { try BirdArt().export(to:URL(fileURLWithPath:path)); exit(0) }
     catch { fputs("Art export failed: \(error)\n",stderr); exit(1) }
 }
+if let path = argument("--export-species") {
+    do { try BirdArt.exportSpecies(to:URL(fileURLWithPath:path)); exit(0) }
+    catch { fputs("Species export failed: \(error)\n",stderr); exit(1) }
+}
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var desktop: DesktopController?
     var fixture: FixtureController?

@@ -36,9 +36,10 @@ final class DesktopView: NSView {
         }
         for (index,bird) in controller.birds.enumerated() {
             let container = sprites[index]
-            let side = 48*controller.scale
-            let rect = CGRect(x:bird.position.x-(bird.facingRight ? 29 : 19)*controller.scale,
-                              y:bird.position.y-39*controller.scale,width:side,height:side)
+            let scale = controller.spriteScale(for:bird)
+            let side = 48*scale
+            let rect = CGRect(x:bird.position.x-(bird.facingRight ? 29 : 19)*scale,
+                              y:bird.position.y+(bird.hopOffset-39)*scale,width:side,height:side)
             let pieces = Geometry.visiblePieces(rect,blockers:bird.blockers(in:controller.surfaces))
             container.isHidden = !rect.intersects(desktopRect) || pieces.isEmpty
             guard !container.isHidden else { continue }
@@ -47,7 +48,7 @@ final class DesktopView: NSView {
             texture.bounds = CGRect(x:0,y:0,width:side,height:side)
             texture.position = CGPoint(x:side/2,y:side/2)
             texture.setAffineTransform(CGAffineTransform(scaleX:bird.facingRight ? 1 : -1,y:1))
-            texture.contents = controller.art.frames[bird.frameName]
+            texture.contents = controller.arts[bird.profile.id]!.frames[bird.frameName]
             let path = CGMutablePath()
             for piece in pieces { path.addRect(piece.offsetBy(dx:-rect.minX,dy:-rect.minY)) }
             let mask = container.mask as! CAShapeLayer
@@ -60,6 +61,23 @@ final class DesktopView: NSView {
 
 final class DesktopController: NSObject {
     let art = BirdArt()
+    let arts = Dictionary(uniqueKeysWithValues: SpeciesID.allCases.map { ($0, BirdArt(species:$0)) })
+    var catalog = SpeciesCatalog.standard
+    let speciesConfigURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Birding/species.json")
+    func spriteScale(for bird: Bird) -> CGFloat { scale * bird.profile.relativeScale }
+    func loadSpeciesConfig() throws {
+        if !FileManager.default.fileExists(atPath:speciesConfigURL.path) {
+            try FileManager.default.createDirectory(at:speciesConfigURL.deletingLastPathComponent(),withIntermediateDirectories:true)
+            let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted,.sortedKeys]
+            try encoder.encode(SpeciesCatalog.standard).write(to:speciesConfigURL,options:.atomic)
+        }
+        catalog = try SpeciesCatalog.decode(Data(contentsOf:speciesConfigURL))
+    }
+    @objc func openSpeciesConfig() { NSWorkspace.shared.open(speciesConfigURL) }
+    @objc func reloadSpeciesConfig() {
+        do { try loadSpeciesConfig(); statusLine.title = "鸟种配置已更新，随后飞入的小鸟使用新配置" }
+        catch { let alert = NSAlert(); alert.messageText = "鸟种配置未载入"; alert.informativeText = error.localizedDescription; alert.runModal() }
+    }
     var birds: [Bird] = []
     var surfaces: [Surface] = [] // Front to back, exactly as supplied by WindowServer.
     var panels: [OverlayPanel] = []
@@ -89,6 +107,7 @@ final class DesktopController: NSObject {
         if let saved = PopulationRange(lower: UserDefaults.standard.integer(forKey:"populationLower"), upper: UserDefaults.standard.integer(forKey:"populationUpper")) {
             population = Population(range:saved)
         }
+        do { try loadSpeciesConfig() } catch { NSLog("Birding species configuration: %@; using bundled defaults",error.localizedDescription) }
         makeMenu(); rebuildScreens()
         sampleWindows(dt: 1.0/30)
         NotificationCenter.default.addObserver(self, selector: #selector(rebuildScreens), name: NSApplication.didChangeScreenParametersNotification, object: nil)
@@ -139,14 +158,16 @@ final class DesktopController: NSObject {
                NSRunningApplication(processIdentifier:pid)?.bundleIdentifier == "dev.birding.desktop" { return nil }
             return Surface(id: id, pid: pid, rect: rect, layer: layer)
         }
-        for bird in birds { bird.updateHost(surfaces: surfaces, sampleDT: dt, spriteScale: scale) }
+        for bird in birds { bird.updateHost(surfaces: surfaces, sampleDT: dt, spriteScale: spriteScale(for:bird)) }
     }
     func bounds(of bird: Bird) -> CGRect {
-        CGRect(x: bird.position.x - (bird.facingRight ? 29 : 19)*scale,
-               y: bird.position.y-39*scale, width: 48*scale, height: 48*scale).insetBy(dx: -2,dy: -2)
+        let scale = spriteScale(for:bird)
+        return CGRect(x: bird.position.x - (bird.facingRight ? 29 : 19)*scale,
+               y: bird.position.y+(bird.hopOffset-39)*scale, width: 48*scale, height: 48*scale).insetBy(dx: -2,dy: -2)
     }
     func chooseDestination(_ bird: Bird, entering: Bool = false) {
         guard !bird.isDeparting else { return }
+        let scale = spriteScale(for:bird)
         func duration(to point: CGPoint) -> Double {
             entering ? max(2.8, Double(Geometry.distance(bird.position,point))/400 * Bird.flightSpeedMultiplier) : Double.random(in:2.6...4.8)
         }
@@ -172,15 +193,14 @@ final class DesktopController: NSObject {
         bird.fly(to: foot, host: nil, duration: entering ? duration(to:foot) : 4.5, arc: 40)
     }
     func bringInBird() {
-        guard let point = Migration.outsidePoint(screens:displayRects,right:Bool.random(),fraction:CGFloat.random(in:0.2...0.75),margin:80*scale+20) else { return }
+        guard let point = Migration.outsidePoint(screens:displayRects,right:Bool.random(),fraction:CGFloat.random(in:0.2...0.75),margin:80*scale*3+20) else { return }
         lastArrivalPosition = point
-        let bird = Bird(position:point,fraction:CGFloat.random(in:0.12...0.88))
-        bird.perchDuration = Double.random(in:14...28)
+        let bird = Bird(position:point,fraction:CGFloat.random(in:0.12...0.88),profile:catalog.choose())
         birds.append(bird); arrivalCount += 1
         chooseDestination(bird,entering:true)
     }
     func sendAway(_ bird: Bird) {
-        guard let point = Migration.outsidePoint(screens:displayRects,right:Bool.random(),fraction:CGFloat.random(in:0.2...0.75),margin:80*scale+20) else { return }
+        guard let point = Migration.outsidePoint(screens:displayRects,right:Bool.random(),fraction:CGFloat.random(in:0.2...0.75),margin:80*scale*3+20) else { return }
         let duration = max(2.8,Double(Geometry.distance(bird.position,point))/400 * Bird.flightSpeedMultiplier)
         bird.depart(to:point,duration:duration)
     }
@@ -212,7 +232,7 @@ final class DesktopController: NSObject {
         for view in views { view.updateSprites() }
         if now-lastDiagnostic > 1 {
             lastDiagnostic = now
-            statusLine.title = "红耳鹎 · \(residentCount) 只 · \(birds.count-residentCount) 只正在离开"
+            statusLine.title = "桌面鸟群 · \(residentCount) 只 · \(birds.count-residentCount) 只正在离开"
             if let diagnosticPath { writeDiagnostics(to: diagnosticPath) }
         }
     }
@@ -224,7 +244,7 @@ final class DesktopController: NSObject {
             "arrivals":arrivalCount,"departures":departureCount,
             "spriteScale":scale, "flightSpeedMultiplier":Bird.flightSpeedMultiplier,
             "nonactivating":panels.allSatisfy{ !$0.canBecomeKey && !$0.canBecomeMain && $0.ignoresMouseEvents },
-            "birds":birds.map{["state":$0.state.rawValue,"departing":$0.isDeparting,"host":$0.hostID ?? 0,"depth":$0.depthID ?? 0,"x":$0.position.x,"y":$0.position.y,"frame":$0.frameName,"followed":$0.followedDistance,"startles":$0.startledCount,"landings":$0.landedCount] as [String:Any]}]
+            "birds":birds.map{["species":$0.profile.id.rawValue,"name":$0.profile.name,"relativeScale":$0.profile.relativeScale,"state":$0.state.rawValue,"departing":$0.isDeparting,"host":$0.hostID ?? 0,"depth":$0.depthID ?? 0,"x":$0.position.x,"y":$0.position.y,"frame":$0.frameName,"followed":$0.followedDistance,"startles":$0.startledCount,"landings":$0.landedCount] as [String:Any]}]
         if let data = try? JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted,.sortedKeys]) { try? data.write(to: URL(fileURLWithPath:path), options: .atomic) }
     }
     func makeMenu() {
@@ -232,7 +252,7 @@ final class DesktopController: NSObject {
         let icon = NSImage(cgImage: art.frames["stand"]!, size: NSSize(width: 24,height: 24))
         status.button?.image = icon; status.button?.toolTip = "Birding · 桌面观鸟"
         let menu = NSMenu()
-        statusLine = NSMenuItem(title: "红耳鹎 · 正在寻找落脚点", action: nil, keyEquivalent: "")
+        statusLine = NSMenuItem(title: "桌面鸟群 · 等待第一只鸟飞来", action: nil, keyEquivalent: "")
         menu.addItem(statusLine); menu.addItem(.separator())
         add(menu,"暂停动画",#selector(togglePause),"p")
         add(menu,"让小鸟飞一会儿",#selector(scatter),"f")
@@ -248,6 +268,8 @@ final class DesktopController: NSObject {
         populationItem.submenu = populationMenu; menu.addItem(populationItem)
         refreshPopulationMenu()
         menu.addItem(.separator())
+        add(menu,"编辑鸟种配置…",#selector(openSpeciesConfig),"")
+        add(menu,"重新载入鸟种配置",#selector(reloadSpeciesConfig),"")
         add(menu,"打开项目说明",#selector(openReadme),"")
         add(menu,"退出 Birding",#selector(quit),"q")
         status.menu = menu

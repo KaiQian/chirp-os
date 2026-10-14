@@ -52,6 +52,7 @@ public enum BirdState: String { case flying, landing, perched }
 public final class Bird {
     public static let flightSpeedMultiplier: Double = 2
     public private(set) var isDeparting = false
+    public let profile: SpeciesProfile
     public var position: CGPoint
     public var state: BirdState = .flying
     public var hostID: UInt32?
@@ -70,7 +71,9 @@ public final class Bird {
     private var arc: CGFloat = 90
     private var flightAge: Double = 0
     private var destinationInvalidated = false
-    public init(position: CGPoint, fraction: CGFloat) {
+    public init(position: CGPoint, fraction: CGFloat, profile: SpeciesProfile = SpeciesCatalog.standard.profile(.redWhiskeredBulbul)) {
+        self.profile = profile
+        self.perchDuration = Double.random(in: profile.perchMin...profile.perchMax)
         self.position = position; self.origin = position; self.target = position; self.fraction = fraction
     }
     // Duration is the original route timing; the multiplier halves travel time only.
@@ -78,7 +81,7 @@ public final class Bird {
     public func fly(to point: CGPoint, host: Surface?, duration: Double = 3, arc: CGFloat = 90) {
         isDeparting = false
         origin = position; target = point; hostID = host?.id; depthID = nil
-        previousHost = nil; flightDuration = max(0.3, duration) / Self.flightSpeedMultiplier; self.arc = arc
+        previousHost = nil; flightDuration = max(0.3, duration) / (Self.flightSpeedMultiplier * profile.speed); self.arc = arc
         flightAge = 0; stateTime = 0; state = .flying; destinationInvalidated = false
     }
     public func depart(to point: CGPoint, duration: Double) {
@@ -151,12 +154,31 @@ public final class Bird {
         // Every flight is above normal windows; menus / utility panels still cover it.
         return surfaces.filter { $0.layer > 0 }.map(\.rect)
     }
+    public var hopOffset: CGFloat {
+        guard state == .perched, profile.id == .treeSparrow else { return 0 }
+        let cycle = stateTime.truncatingRemainder(dividingBy: 9)
+        guard cycle > 1, cycle < 2 else { return 0 }
+        return -CGFloat(abs(sin((cycle-1)*Double.pi*2))) * 3
+    }
     public var frameName: String {
         switch state {
-        case .flying: return "fly\(Int(stateTime * 20) % 8)"
+        case .flying: return "fly\(Int(stateTime * profile.flapFPS) % 8)"
         case .landing: return "land\(min(2, Int(stateTime / 0.14)))"
         case .perched:
             let cycle = stateTime.truncatingRemainder(dividingBy: 9)
+            switch profile.id {
+            case .treeSparrow:
+                if cycle > 1 && cycle < 2 { return "idle\(Int(cycle*6)%2)" }
+            case .spottedDove:
+                if cycle > 2 && cycle < 4 { return "idle\(Int(cycle*2.5)%2)" }
+            case .chineseBlackbird:
+                if cycle > 2 && cycle < 3.2 { return "idle\(Int(cycle*3)%2)" }
+            case .magpieRobin:
+                if cycle > 1 && cycle < 3.6 { return "idle\(Int(cycle*3.5)%2)" }
+            case .longTailedShrike:
+                if cycle > 2 && cycle < 5 { return "idle\(Int(cycle*1.2)%2)" }
+            default: break
+            }
             if cycle > 6.2 && cycle < 7.3 { return "preen\(Int((cycle-6.2)*6) % 2)" }
             if cycle > 3.0 && cycle < 3.18 { return "blink" }
             return Int(stateTime * 1.8) % 2 == 0 ? "stand" : "breathe"

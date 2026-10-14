@@ -1,0 +1,11 @@
+{
+  "species": [
+    {"id":"redWhiskeredBulbul","name":"红耳鹎","adultLengthCM":19,"weight":1000,"flapFPS":20,"speed":1,"perchMin":14,"perchMax":28,"weightBasis":"游戏估计值；缺少与其余鸟种同口径的上海数量，不是实测概率"},
+    {"id":"treeSparrow","name":"麻雀","adultLengthCM":14.5,"weight":18647,"flapFPS":30,"speed":1.12,"perchMin":8,"perchMax":18,"weightBasis":"上海2017–2023观鸟研究表2：18647只次"},
+    {"id":"lightVentedBulbul","name":"白头鹎","adultLengthCM":19,"weight":17136,"flapFPS":20,"speed":1,"perchMin":14,"perchMax":28,"weightBasis":"上海2017–2023观鸟研究表2：17136只次"},
+    {"id":"spottedDove","name":"珠颈斑鸠","adultLengthCM":31,"weight":15536,"flapFPS":18,"speed":0.92,"perchMin":20,"perchMax":42,"weightBasis":"上海2017–2023观鸟研究表2：15536只次"},
+    {"id":"chineseBlackbird","name":"乌鸫","adultLengthCM":28.5,"weight":12697,"flapFPS":19,"speed":1.08,"perchMin":12,"perchMax":26,"weightBasis":"上海2017–2023观鸟研究表2：12697只次"},
+    {"id":"magpieRobin","name":"鹊鸲","adultLengthCM":20,"weight":2500,"flapFPS":24,"speed":1.05,"perchMin":10,"perchMax":22,"weightBasis":"游戏估计值；依据上海常见留鸟资料，非同口径实测概率"},
+    {"id":"longTailedShrike","name":"棕背伯劳","adultLengthCM":22.5,"weight":1800,"flapFPS":18,"speed":1.15,"perchMin":24,"perchMax":45,"weightBasis":"游戏估计值；依据上海栖息地调查，非同口径实测概率"}
+  ]
+}

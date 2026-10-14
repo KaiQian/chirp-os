@@ -24,6 +24,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </dict></plist>
 PLIST
 "$ROOT/.build/release/Birding" --export-art "$ROOT/Assets"
+rm -rf "$APP/Contents/Resources/Birding_BirdingCore.bundle"
+cp -R "$ROOT/.build/release/Birding_BirdingCore.bundle" "$APP/Contents/Resources/"
 cp "$ROOT/Assets/stand.png" "$APP/Contents/Resources/stand.png"
 codesign --force --sign - "$APP"
 printf 'Built: %s\n' "$APP"

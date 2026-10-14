@@ -1,0 +1,50 @@
+import Foundation
+
+public enum SpeciesID: String, Codable, CaseIterable {
+    case redWhiskeredBulbul, treeSparrow, lightVentedBulbul, spottedDove, chineseBlackbird, magpieRobin, longTailedShrike
+}
+public struct SpeciesProfile: Codable, Equatable {
+    public let id: SpeciesID
+    public let name: String
+    public let adultLengthCM: Double
+    public let weight: Double
+    public let flapFPS: Double
+    public let speed: Double
+    public let perchMin: Double
+    public let perchMax: Double
+    public let weightBasis: String
+    // All sprites share a calibrated 46-pixel bill-to-tail flight length.
+    public var relativeScale: Double { adultLengthCM / 19 }
+}
+public struct SpeciesCatalog: Codable {
+    public let species: [SpeciesProfile]
+    public static let standard: SpeciesCatalog = {
+        let packaged = Bundle.main.resourceURL?.appendingPathComponent("Birding_BirdingCore.bundle/species.json")
+        let url = packaged.flatMap { FileManager.default.fileExists(atPath:$0.path) ? $0 : nil }
+            ?? Bundle.module.url(forResource: "species", withExtension: "json")!
+        return try! decode(Data(contentsOf: url))
+    }()
+    public static func decode(_ data: Data) throws -> SpeciesCatalog {
+        let value = try JSONDecoder().decode(Self.self, from: data)
+        guard Set(value.species.map(\.id)) == Set(SpeciesID.allCases), value.species.count == SpeciesID.allCases.count,
+              value.species.allSatisfy({ $0.adultLengthCM.isFinite && (10...40).contains($0.adultLengthCM) &&
+                  $0.weight.isFinite && (0...1_000_000).contains($0.weight) &&
+                  $0.flapFPS.isFinite && (4...60).contains($0.flapFPS) &&
+                  $0.speed.isFinite && (0.5...2).contains($0.speed) &&
+                  $0.perchMin.isFinite && $0.perchMax.isFinite && (2...300).contains($0.perchMin) &&
+                  ($0.perchMin...600).contains($0.perchMax) }), value.species.contains(where: {$0.weight > 0}) else {
+            throw NSError(domain: "Birding.Species", code: 1, userInfo: [NSLocalizedDescriptionKey: "鸟种配置无效：需要全部七种鸟，正体长、合法动画参数和至少一个正权重。"])
+        }
+        return value
+    }
+    public func profile(_ id: SpeciesID) -> SpeciesProfile { species.first { $0.id == id }! }
+    public func choose(unit: Double = Double.random(in: 0..<1)) -> SpeciesProfile {
+        let enabled = species.filter { $0.weight > 0 }
+        var ticket = min(1-Double.ulpOfOne, max(0, unit.isFinite ? unit : 0)) * enabled.reduce(0) { $0 + $1.weight }
+        for profile in enabled {
+            if ticket < profile.weight { return profile }
+            ticket -= profile.weight
+        }
+        return enabled.last!
+    }
+}
