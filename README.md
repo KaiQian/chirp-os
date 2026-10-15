@@ -21,11 +21,23 @@
 
 ### 有什么好玩的
 
-- 七种鸟：红耳鹎、麻雀、白头鹎、珠颈斑鸠、乌鸫、鹊鸲、棕背伯劳，各有鲜明外形和习性动作。
+- 多种小鸟，各有鲜明外形和习性动作，详见下方[鸟种列表](#鸟种--bird-species)。
 - 小鸟随窗口缓慢移动，快速拖动时可能受惊飞走；前方窗口会遮住后方停留的小鸟。
 - 鸟群随机飞入、飞出，可设置数量范围，例如 3–5、8–12 或 15–20 只。
 - 自由调整每种鸟的出现概率并锁定；也可设置体长、振翅频率、飞速和停留时间。
 - 支持中英文切换、暂停动画和随系统启动。
+
+### 鸟种 / Bird species
+
+| 中文 | English |
+| --- | --- |
+| 红耳鹎 | Red-whiskered Bulbul |
+| 麻雀 | Eurasian Tree Sparrow |
+| 白头鹎 | Light-vented Bulbul |
+| 珠颈斑鸠 | Spotted Dove |
+| 乌鸫 | Chinese Blackbird |
+| 鹊鸲 | Oriental Magpie-Robin |
+| 棕背伯劳 | Long-tailed Shrike |
 
 ### 开始观鸟
 
@@ -49,7 +61,7 @@ ChirpOS brings pixel-art birds to your macOS or Windows desktop. They fly in fro
 
 ### Features
 
-- Seven distinctive species: Red-whiskered Bulbul, Eurasian Tree Sparrow, Light-vented Bulbul, Spotted Dove, Chinese Blackbird, Oriental Magpie-Robin, and Long-tailed Shrike.
+- Distinctive bird species, each with its own appearance and behavior. See the [Chinese–English species list](#鸟种--bird-species).
 - Birds follow gently moved windows and may startle when dragged quickly. Foreground windows hide birds perched behind them.
 - Birds arrive and leave at random, with configurable population ranges such as 3–5, 8–12, or 15–20.
 - Adjust and lock arrival probabilities, and customize size, wingbeat rate, speed, and perch duration.
