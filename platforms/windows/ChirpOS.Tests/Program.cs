@@ -2,6 +2,7 @@ using ChirpOS.Core;
 var count = 0;
 void Check(bool condition, string name) { if (!condition) throw new Exception(name); count++; Console.WriteLine("PASS " + name); }
 var s = new Species("redWhiskeredBulbul", "红耳鹎", 19, 1, 20, 1, 14, 28);
+Check(s.Scale==1 && Math.Abs((s with{AdultLengthCM=94}).Scale-2.5)<1e-9,"compressed size anchors bulbul at 1 and heron at 2.5");
 var rng = new Random(42); var profiles = Enumerable.Range(0, 7).Select(i => s with { Weight = i + 1 }).ToArray(); var p = Probabilities.From(profiles);
 for (var step = 0; step < 10000; step++)
 {
@@ -43,7 +44,7 @@ var behavior=new Behavior(28,32,1.5,6,9);pref.Behaviors[s.Id]=behavior;
 var restored=System.Text.Json.JsonSerializer.Deserialize<Preferences>(System.Text.Json.JsonSerializer.Serialize(pref))!;
 Check(restored.Valid(7) && restored.Resolve(s).AdultLengthCM==28 && restored.Resolve(s).FlapFPS==32 && restored.Resolve(s).Speed==1.5 && restored.Resolve(s).PerchMin==6 && restored.Resolve(s).PerchMax==9,"behavior values survive save and reload");
 var configured=new Bird(restored.Resolve(s),new(0,0),new Random(1));configured.Fly(new(100,0),a,3);configured.Tick(1);
-Check(configured.State==BirdState.Landing && configured.Species.Scale==28.0/19 && configured.PerchDuration>=6 && configured.PerchDuration<=9,"new arrivals use configured size speed and duration");
+Check(configured.State==BirdState.Landing && Math.Abs(configured.Species.Scale-Math.Pow(28.0/19,Math.Log(2.5)/Math.Log(94d/19)))<1e-9 && configured.PerchDuration>=6 && configured.PerchDuration<=9,"new arrivals use configured size speed and duration");
 Check(!(behavior with{PerchMin=20,PerchMax=10}).Valid && !(behavior with{FlapFPS=61}).Valid && !(behavior with{AdultLengthCM=double.NaN}).Valid,"invalid behavior rejected");
 var draft=System.Text.Json.JsonSerializer.Deserialize<Preferences>(System.Text.Json.JsonSerializer.Serialize(pref))!;draft.Behaviors[s.Id]=behavior with{Speed=.5};
 Check(pref.Resolve(s).Speed==1.5,"unsaved behavior edits do not mutate active settings");
@@ -59,4 +60,28 @@ Check(free.Count==2 && free.All(r=>r.Hi<500 || r.Lo>500) && free.All(r=>!Geometr
 Check(Geometry.LandingRanges(edge,new[]{edge},desktop,1,new[]{new Box(0,200,1000,500)}).Count==0,"full edge has no remaining destination");
 var clipped=new Surface(102,new(-1000,300,1500,400));var clippedRanges=Geometry.LandingRanges(clipped,new[]{clipped},desktop,1,[]);
 Check(clippedRanges.Count==1 && clippedRanges[0].Lo==29 && clippedRanges[0].Hi==458,"offscreen host retains exposed landing edge");
+
+var hover=new HoverTracker<object>();var one=new object();var two=new object();
+Check(hover.Update(one,10)==null && hover.Update(one,10.99)==null && hover.Update(one,11)==one,"hover waits 1 second");
+Check(hover.Update(two,13.1)==null && hover.Update(null,14)==null && hover.Update(two,17)==null && hover.Update(two,20)==two,"hover resets on identity change and exit");
+Check(SpeciesBehavior.Frame("nightHeron",12)=="stand" && SpeciesBehavior.Frame("nightHeron",21)=="stretch" && SpeciesBehavior.Frame("nightHeron",31.4)!.StartsWith("poop") && SpeciesBehavior.Frame("nightHeron",33)=="stand","night heron quiet watch and spaced actions");
+var sideHost=new Surface(201,new(300,100,500,600));
+var woodpecker=new Bird(s with {Id="greatSpottedWoodpecker"},new(0,0),rng){Edge=PerchEdge.Right,Fraction=.5};woodpecker.Perch(sideHost);
+Check(woodpecker.Position==new V(800,400) && !woodpecker.Right,"side perch faces window");
+woodpecker.UpdateHost(new[]{sideHost with{Rect=new(300,100,530,600)}},.033,1);woodpecker.Tick(4.2);
+Check(woodpecker.Position.X==830 && woodpecker.Frame.StartsWith("peck"),"side perch tracks resize and pecks");
+var sideCover=new Surface(202,new(250,200,100,180));
+var sideRanges=Geometry.SideRanges(sideHost,PerchEdge.Left,new[]{sideCover,sideHost},new(0,0,1200,900),1,[]);
+Check(sideRanges.Count>0 && sideRanges.All(q=>!Geometry.Landing(new(300,(q.Lo+q.Hi)/2),1).Intersects(sideCover.Rect)),"side landing avoids occlusion");
+var oldIds=new[]{"redWhiskeredBulbul","treeSparrow","lightVentedBulbul","spottedDove","chineseBlackbird","magpieRobin","longTailedShrike"};
+var migrationSpecies=oldIds.Append("nightHeron").Select(id=>s with{Id=id}).ToArray();
+var oldPrefs=new Preferences{Probability=new(){Points=[10000,0,0,0,0,0,0],Locked=[true,false,false,false,false,false,false]}};
+Check(oldPrefs.Migrate(migrationSpecies) && oldPrefs.Probability.Points[0]==10000 && oldPrefs.Probability.Locked[0] && oldPrefs.Probability.Points[7]==0,"old preferences preserve exact probabilities and locks");
+Check(oldPrefs.Migrate(migrationSpecies.Reverse().ToArray()) && oldPrefs.Probability.Points[7]==10000,"saved species IDs survive catalog reorder");
+oldPrefs.AllocateNewSpecies(migrationSpecies.Reverse().ToArray());
+Check(oldPrefs.Probability.Points[0]==1250 && oldPrefs.Probability.Points[7]==8750 && oldPrefs.Probability.Locked[7],"new species share by count scales locked values but keeps locks");
+var roundtrip=System.Text.Json.JsonSerializer.Deserialize<Preferences>(System.Text.Json.JsonSerializer.Serialize(oldPrefs))!;
+Check(roundtrip.Migrate(migrationSpecies.Reverse().ToArray()) && roundtrip.PendingSpeciesIds!.SequenceEqual(new[]{"nightHeron"}),"unresolved new species remain pending across restarts");
+var galleryFrames=Enumerable.Range(0,1200).Select(i=>GalleryPose.Frame("nightHeron",i/30d,20)).ToHashSet();
+Check(new[]{"fly0","fly7","land2","idle1","preen1","stretch","shake","poop0","poop1"}.All(galleryFrames.Contains),"gallery cycles regular and special actions");
 Console.WriteLine($"{count} core checks passed.");

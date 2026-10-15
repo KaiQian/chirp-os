@@ -6,6 +6,7 @@ enum AppLanguage: String {
     func text(_ zh:String,_ en:String) -> String { self == .chinese ? zh : en }
     var switchTitle: String { self == .chinese ? "English" : "中文" }
     func name(_ id:SpeciesID) -> String {
+        if let p = SpeciesCatalog.standard.species.first(where: { $0.id == id }), let en = p.englishName { return text(p.name,en) }
         switch id {
         case .redWhiskeredBulbul: return text("红耳鹎","Red-whiskered Bulbul")
         case .treeSparrow: return text("麻雀","Eurasian Tree Sparrow")
@@ -14,6 +15,7 @@ enum AppLanguage: String {
         case .chineseBlackbird: return text("乌鸫","Chinese Blackbird")
         case .magpieRobin: return text("鹊鸲","Oriental Magpie-Robin")
         case .longTailedShrike: return text("棕背伯劳","Long-tailed Shrike")
+        default: return SpeciesCatalog.standard.profile(id).name
         }
     }
 }

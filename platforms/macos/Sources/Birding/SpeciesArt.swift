@@ -20,7 +20,7 @@ enum SpeciesArt {
             colours = ["brown":0x273944FF,"light":0x405563FF,"gold":0x657786FF,"shadow":0x202C36FF,"cream":0xF2F1E2FF,"white":0xFFFFF3FF]
         case .longTailedShrike:
             colours = ["brown":0xB57040FF,"light":0xD39453FF,"gold":0xE9B679FF,"shadow":0x474148FF,"cream":0xEFE1BEFF,"white":0xFFF0D3FF,"crest":0xA2A5A8FF]
-        case .redWhiskeredBulbul: colours = [:]
+        default: colours = [:]
         }
         c.colours.merge(colours) { _,new in new }
         return c
@@ -128,7 +128,7 @@ enum SpeciesArt {
             p([(27,18),(32,17),(36,17),(35,21),(30,23),(27,21)],"cream")
             p([(26,14),(36,13),(38,15),(37,17),(27,17)],"ink") // broad black eye mask
             p([(37,14),(43,15),(43,18),(41,19),(41,17),(37,17)],"ink") // hooked bill
-        case .redWhiskeredBulbul: break
+        default: break
         }
         b(33,13,2,2,"eye")
         if !blink { b(34,13,1,1,"shine") } else { b(33,13,2,1,"light") }

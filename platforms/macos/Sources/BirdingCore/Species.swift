@@ -1,11 +1,13 @@
 import Foundation
 
 public enum SpeciesID: String, Codable, CaseIterable {
+    case nightHeron, plumbeousWaterRedstart, littleEgret, greyHeron, commonKestrel, peregrineFalcon, blackKite, commonBuzzard, orientalMagpie, azureWingedMagpie, largeBilledCrow, hoopoe, barnSwallow, mallard, asianKoel, swinhoesWhiteEye, blackHeadedGull, whimbrel, piedKingfisher, eurasianWoodcock, blackDrongo, chinesePondHeron, yellowRumpedFlycatcher, yellowBrowedWarbler, greatTit, commonMoorhen, greatSpottedWoodpecker, vinousThroatedParrotbill, blackWingedStilt, eurasianCoot, redBilledLeiothrix, blackCollaredStarling, commonKingfisher, littleRingedPlover, yellowBilledGrosbeak, redFlankedBluetail
     case redWhiskeredBulbul, treeSparrow, lightVentedBulbul, spottedDove, chineseBlackbird, magpieRobin, longTailedShrike
 }
 public struct SpeciesProfile: Codable, Equatable {
     public let id: SpeciesID
     public let name: String
+    public var englishName: String? = nil
     public var adultLengthCM: Double
     public let weight: Double
     public var flapFPS: Double
@@ -13,8 +15,8 @@ public struct SpeciesProfile: Codable, Equatable {
     public var perchMin: Double
     public var perchMax: Double
     public let weightBasis: String
-    // All sprites share a calibrated 46-pixel bill-to-tail flight length.
-    public var relativeScale: Double { adultLengthCM / 19 }
+    // Compress adult-length ratios: 19 cm bulbul = 1×, 94 cm heron = 2.5×.
+    public var relativeScale: Double { pow(adultLengthCM / 19, log(2.5) / log(94.0 / 19)) }
 }
 public struct SpeciesCatalog: Codable {
     public var species: [SpeciesProfile]
@@ -27,13 +29,13 @@ public struct SpeciesCatalog: Codable {
     public static func decode(_ data: Data) throws -> SpeciesCatalog {
         let value = try JSONDecoder().decode(Self.self, from: data)
         guard Set(value.species.map(\.id)) == Set(SpeciesID.allCases), value.species.count == SpeciesID.allCases.count,
-              value.species.allSatisfy({ $0.adultLengthCM.isFinite && (10...40).contains($0.adultLengthCM) &&
+              value.species.allSatisfy({ $0.adultLengthCM.isFinite && (8...110).contains($0.adultLengthCM) &&
                   $0.weight.isFinite && (0...1_000_000).contains($0.weight) &&
                   $0.flapFPS.isFinite && (4...60).contains($0.flapFPS) &&
                   $0.speed.isFinite && (0.5...2).contains($0.speed) &&
                   $0.perchMin.isFinite && $0.perchMax.isFinite && (2...300).contains($0.perchMin) &&
                   ($0.perchMin...600).contains($0.perchMax) }), value.species.contains(where: {$0.weight > 0}) else {
-            throw NSError(domain: "Birding.Species", code: 1, userInfo: [NSLocalizedDescriptionKey: "鸟种配置无效：需要全部七种鸟，正体长、合法动画参数和至少一个正权重。"])
+            throw NSError(domain: "Birding.Species", code: 1, userInfo: [NSLocalizedDescriptionKey: "鸟种配置无效：需要全部鸟种，正体长、合法动画参数和至少一个正权重。"])
         }
         return value
     }

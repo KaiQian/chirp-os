@@ -45,15 +45,19 @@ struct PixelCanvas {
 }
 
 final class BirdArt {
-    static let names = ["stand","breathe","blink","preen0","preen1","land0","land1","land2","fly0","fly1","fly2","fly3","fly4","fly5","fly6","fly7","idle0","idle1"]
+    static let names = ["stand","breathe","blink","preen0","preen1","land0","land1","land2","fly0","fly1","fly2","fly3","fly4","fly5","fly6","fly7","idle0","idle1","stretch","shake","poop0","poop1","cling0","cling1","peck0","peck1"]
     let frames: [String: CGImage]
     let species: SpeciesID
     init(species: SpeciesID = .redWhiskeredBulbul) {
         self.species = species
+        let legacy: Set<SpeciesID> = [.redWhiskeredBulbul,.treeSparrow,.lightVentedBulbul,.magpieRobin]
         frames = Dictionary(uniqueKeysWithValues: Self.names.map {
-            ($0, species == .redWhiskeredBulbul ? Self.make($0).image : SpeciesArt.make($0,species:species).image)
+            ($0, legacy.contains(species)
+             ? (species == .redWhiskeredBulbul ? Self.make($0).image : SpeciesArt.make($0,species:species).image)
+             : DetailedBirdArt.make($0,species:species))
         })
     }
+
     static func make(_ name: String) -> PixelCanvas {
         if name.hasPrefix("fly"), let phase = Int(name.dropFirst(3)) { return flight(phase) }
         var c = PixelCanvas()
@@ -250,7 +254,7 @@ final class BirdArt {
             let rep = NSBitmapImageRep(cgImage: image)
             try rep.representation(using: .png, properties: [:])!.write(to: folder.appendingPathComponent(name+".png"))
         }
-        let width = 1152, height = 640
+        let width = 1152, height = ((Self.names.count+7)/8)*210+10
         let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height, bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
         let graphics = NSGraphicsContext(bitmapImageRep: rep)!
         NSGraphicsContext.saveGraphicsState(); NSGraphicsContext.current = graphics

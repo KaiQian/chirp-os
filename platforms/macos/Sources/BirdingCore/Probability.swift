@@ -12,6 +12,29 @@ public struct ProbabilityDistribution: Codable, Equatable {
         let values = Self.apportion(10_000, amounts:catalog.species.map(\.weight))
         entries = zip(catalog.species,values).map { ProbabilityEntry(id:$0.0.id,points:$0.1,locked:false) }
     }
+    // Existing percentages and locks remain exact. New species start disabled in
+    // an existing profile until the user adjusts them or restores defaults.
+    public mutating func includeNewSpecies() throws {
+        guard !entries.isEmpty, Set(entries.map(\.id)).count == entries.count,
+              entries.allSatisfy({ (0...10_000).contains($0.points) }),
+              entries.reduce(0, { $0 + $1.points }) == 10_000 else {
+            throw NSError(domain:"BirdSettings",code:2)
+        }
+        let present = Set(entries.map(\.id))
+        entries += SpeciesCatalog.standard.species.filter { !present.contains($0.id) }
+            .map { ProbabilityEntry(id:$0.id,points:0,locked:false) }
+    }
+    public mutating func allocateNewSpecies(_ ids:[SpeciesID], catalog:SpeciesCatalog) {
+        let fresh=Set(ids)
+        let added=entries.indices.filter{fresh.contains(entries[$0].id)}
+        let old=entries.indices.filter{!fresh.contains(entries[$0].id)}
+        guard !added.isEmpty else {return}
+        let budget=Int((10000*Double(added.count)/Double(entries.count)).rounded())
+        let newPoints=Self.apportion(budget,amounts:added.map{catalog.profile(entries[$0].id).weight})
+        let oldPoints=Self.apportion(10000-budget,amounts:old.map{Double(entries[$0].points)})
+        for (i,n) in zip(added,newPoints) {entries[i].points=n}
+        for (i,n) in zip(old,oldPoints) {entries[i].points=n}
+    }
     public var isValid: Bool {
         entries.count == SpeciesID.allCases.count && Set(entries.map(\.id)) == Set(SpeciesID.allCases) &&
         entries.allSatisfy { (0...10_000).contains($0.points) } && entries.reduce(0) { $0+$1.points } == 10_000
@@ -58,11 +81,20 @@ public struct ProbabilityDistribution: Codable, Equatable {
 public struct BirdSettings: Codable {
     public var catalog: SpeciesCatalog
     public var probabilities: ProbabilityDistribution
+    public var pendingSpecies: [SpeciesID]? = nil
     public init(catalog:SpeciesCatalog = .standard) {
         self.catalog = catalog; probabilities = ProbabilityDistribution(catalog:catalog)
     }
     public static func decode(_ data:Data) throws -> BirdSettings {
-        let value = try JSONDecoder().decode(Self.self,from:data)
+        var value = try JSONDecoder().decode(Self.self,from:data)
+        guard Set(value.catalog.species.map(\.id)).count == value.catalog.species.count else { throw NSError(domain:"BirdSettings",code:3) }
+        let present = Set(value.catalog.species.map(\.id))
+        guard present == Set(value.probabilities.entries.map(\.id)) else {throw NSError(domain:"BirdSettings",code:4)}
+        let added=SpeciesCatalog.standard.species.filter { !present.contains($0.id) }
+        let pending=Set(value.pendingSpecies ?? []).union(added.map(\.id))
+        value.pendingSpecies=SpeciesCatalog.standard.species.map(\.id).filter{pending.contains($0)}
+        value.catalog.species += added
+        try value.probabilities.includeNewSpecies()
         _ = try SpeciesCatalog.decode(JSONEncoder().encode(value.catalog))
         guard value.probabilities.isValid else { throw NSError(domain:"BirdSettings",code:1) }
         return value
@@ -77,7 +109,15 @@ public struct BirdSettings: Codable {
     public static func load(from url:URL, legacyURL:URL) throws -> BirdSettings {
         if FileManager.default.fileExists(atPath:url.path) { return try decode(Data(contentsOf:url)) }
         if FileManager.default.fileExists(atPath:legacyURL.path) {
-            return BirdSettings(catalog:try SpeciesCatalog.decode(Data(contentsOf:legacyURL)))
+            var catalog=try JSONDecoder().decode(SpeciesCatalog.self,from:Data(contentsOf:legacyURL))
+            let original=catalog
+            let ids=Set(catalog.species.map(\.id))
+            catalog.species += SpeciesCatalog.standard.species.filter{!ids.contains($0.id)}
+            var result=BirdSettings(catalog:try SpeciesCatalog.decode(JSONEncoder().encode(catalog)))
+            result.probabilities=ProbabilityDistribution(catalog:original)
+            try result.probabilities.includeNewSpecies()
+            result.pendingSpecies=catalog.species.map(\.id).filter{!ids.contains($0)}
+            return result
         }
         return BirdSettings()
     }

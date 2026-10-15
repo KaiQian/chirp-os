@@ -10,7 +10,8 @@ internal static class DesktopVerification
     {
         var checks = new Dictionary<string, bool>(); Directory.CreateDirectory(Program.DataFolder);
         using var stream = Program.Resource("species.json"); var species = JsonSerializer.Deserialize<Catalog>(stream, Program.Json)!.Species;
-        foreach (var s in species) { using var png = Program.Resource("art/" + s.Id + ".png"); using var img = Image.FromStream(png); checks["atlas_" + s.Id] = img.Width == 864 && img.Height == 48; }
+        using var manifestStream=Program.Resource("art/manifest.json");using var manifest=JsonDocument.Parse(manifestStream);var frameCount=manifest.RootElement.GetProperty("frames").GetArrayLength();
+        foreach (var s in species) { using var png = Program.Resource("art/" + s.Id + ".png"); using var img = Image.FromStream(png); checks["atlas_" + s.Id] = img.Width == img.Height*frameCount && img.Height >= 48 && img.Height <= 120; }
         using var imageStream = Program.Resource("art/redWhiskeredBulbul.png"); using var source = Image.FromStream(imageStream); using var atlas = new Bitmap(source);
         using var fixture = Process.Start(new ProcessStartInfo(Environment.ProcessPath!, "--fixture") { UseShellExecute = false })!;
         using var overlay = new Overlay(); var bird = new Bird(species[0], new(200, 200), new Random(1));

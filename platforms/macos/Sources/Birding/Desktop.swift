@@ -12,6 +12,7 @@ final class DesktopView: NSView {
     weak var controller: DesktopController?
     var desktopRect: CGRect = .zero
     private var sprites: [CALayer] = []
+    private let nameLabel=CATextLayer()
     override var isFlipped: Bool { true }
     override var isOpaque: Bool { false }
     override init(frame: NSRect) {
@@ -55,6 +56,25 @@ final class DesktopView: NSView {
             mask.frame = CGRect(origin:.zero,size:rect.size)
             mask.path = path; mask.fillColor = NSColor.black.cgColor
         }
+        if nameLabel.superlayer == nil {
+            nameLabel.fontSize=13;nameLabel.alignmentMode = .center
+            nameLabel.foregroundColor=NSColor.white.cgColor
+            nameLabel.backgroundColor=NSColor.black.withAlphaComponent(0.8).cgColor
+            nameLabel.cornerRadius=6;nameLabel.contentsScale=window?.backingScaleFactor ?? 2
+            root.addSublayer(nameLabel)
+        }
+        nameLabel.zPosition=1000
+        nameLabel.isHidden=true
+        if let bird=controller.hoveredBird, desktopRect.contains(bird.position) {
+            let text=controller.language.name(bird.profile.id)
+            let width=min(desktopRect.width,ceil((text as NSString).size(withAttributes:[.font:NSFont.systemFont(ofSize:13)]).width)+20)
+            let pixel=controller.arts[bird.profile.id]!.topPixel(frame:bird.frameName)
+            let top=bird.position.y+(CGFloat(pixel)+bird.hopOffset-39)*controller.spriteScale(for:bird)
+            let x=min(desktopRect.maxX-width,max(desktopRect.minX,bird.position.x-width/2))
+            let y=max(desktopRect.minY,top-28)
+            nameLabel.frame=CGRect(x:x-desktopRect.minX,y:y-desktopRect.minY,width:width,height:23)
+            nameLabel.string=text;nameLabel.isHidden=false
+        }
         CATransaction.commit()
     }
 }
@@ -69,6 +89,7 @@ final class DesktopController: NSObject {
     var catalog: SpeciesCatalog { settings.catalog }
     var preferences = UserDefaults.standard
     var language = AppLanguage.chinese
+    var gallery:SpeciesGallery?
     var settingsWindow: SpeciesSettingsWindow?
     var settingsURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Birding/settings.json")
     var legacyURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Birding/species.json")
@@ -76,8 +97,13 @@ final class DesktopController: NSObject {
     func spriteScale(for bird: Bird) -> CGFloat { scale * bird.profile.relativeScale }
     func loadSpeciesConfig() throws { settings = try BirdSettings.load(from:settingsURL,legacyURL:legacyURL) }
     func applySettings(_ value:BirdSettings) throws {
-        try value.save(to:settingsURL)
-        settings = value
+        var saved=value;saved.pendingSpecies=[]
+        try saved.save(to:settingsURL)
+        settings = saved
+    }
+    @objc func showSpeciesGallery() {
+        if gallery == nil {gallery=SpeciesGallery(desktop:self)}
+        gallery?.showWindow(nil);NSApp.activate(ignoringOtherApps:true)
     }
     @objc func showSpeciesSettings() {
         if let settingsWindow, settingsWindow.window?.isVisible == true {
@@ -97,6 +123,8 @@ final class DesktopController: NSObject {
         statusLine.title = t("桌面鸟群 · \(residentCount) 只 · \(birds.count-residentCount) 只正在离开",
                              "Birds · \(residentCount) visiting · \(birds.count-residentCount) departing")
     }
+    var hoverTracker=HoverTracker<ObjectIdentifier>()
+    weak var hoveredBird:Bird?
     var birds: [Bird] = []
     var surfaces: [Surface] = [] // Front to back, exactly as supplied by WindowServer.
     var panels: [OverlayPanel] = []
@@ -129,6 +157,7 @@ final class DesktopController: NSObject {
         }
         do { try loadSpeciesConfig() } catch { NSLog("Birding species configuration: %@; using bundled defaults",error.localizedDescription) }
         makeMenu(); rebuildScreens()
+        if !CommandLine.arguments.contains(where:{$0.hasPrefix("--verify") || $0 == "--integration"}) {DispatchQueue.main.async { [weak self] in self?.promptNewSpecies() }}
         sampleWindows(dt: 1.0/30)
         NotificationCenter.default.addObserver(self, selector: #selector(rebuildScreens), name: NSApplication.didChangeScreenParametersNotification, object: nil)
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(spaceChanged), name: NSWorkspace.activeSpaceDidChangeNotification, object: nil)
@@ -193,9 +222,28 @@ final class DesktopController: NSObject {
         }
         let occupied = birds.filter { $0 !== bird && !$0.isDeparting }.compactMap { other -> CGRect? in
             guard let id = other.hostID, let host = surfaces.first(where: { $0.id == id }) else { return nil }
-            let foot = CGPoint(x: Geometry.perchX(other.fraction, rect: host.rect), y: host.rect.minY)
+            let foot = Geometry.foot(on:host,fraction:other.fraction,edge:other.edge)
             return Geometry.landingFootprint(at: foot, scale: spriteScale(for: other)).insetBy(dx: -8, dy: -8)
         }
+        if bird.profile.id == .greatSpottedWoodpecker {
+            var sides:[(Surface,PerchEdge,ClosedRange<CGFloat>)]=[]
+            for host in surfaces where host.layer == 0 && host.rect.height >= 180 {
+                for edge in [PerchEdge.left,.right] { for screen in screenRects {
+                    for range in Geometry.sideRanges(on:host,edge:edge,surfaces:surfaces,screen:screen,scale:scale,occupied:occupied) { sides.append((host,edge,range)) }
+                }}
+            }
+            let length=sides.reduce(CGFloat.zero){$0+$1.2.upperBound-$1.2.lowerBound}
+            var ticket=CGFloat.random(in:0...max(0,length))
+            for (host,edge,range) in sides {
+                let n=range.upperBound-range.lowerBound
+                if ticket<n {
+                    bird.edge=edge;bird.fraction=(range.lowerBound+ticket-host.rect.minY-42)/(host.rect.height-84)
+                    let point=Geometry.foot(on:host,fraction:bird.fraction,edge:edge)
+                    bird.fly(to:point,host:host,duration:duration(to:point));return
+                };ticket-=n
+            }
+        }
+        bird.edge = .top
         var choices: [(Surface, ClosedRange<CGFloat>)] = []
         for host in surfaces where host.layer == 0 && host.rect.width >= 180 && host.rect.height >= 100 {
             for screen in screenRects {
@@ -261,6 +309,7 @@ final class DesktopController: NSObject {
                 return gone
             }
         }
+        updateHover(now:now)
         for view in views { view.updateSprites() }
         if now-lastDiagnostic > 1 {
             lastDiagnostic = now
@@ -301,6 +350,7 @@ final class DesktopController: NSObject {
         populationItem.submenu = populationMenu; menu.addItem(populationItem)
         refreshPopulationMenu()
         menu.addItem(.separator())
+        add(menu,t("鸟种测试…","Bird test…"),#selector(showSpeciesGallery),"")
         add(menu,t("鸟种设置…","Bird settings…"),#selector(showSpeciesSettings),"")
         addLoginItem(to:menu)
         add(menu,language.switchTitle,#selector(toggleLanguage),"")

@@ -9,7 +9,7 @@ extension BirdArt {
         let arts = profiles.map { BirdArt(species:$0.id) }
         for (i,p) in profiles.enumerated() { try arts[i].export(to:folder.appendingPathComponent(p.id.rawValue)) }
         func render(time:Double?, detail:Bool = false) -> NSBitmapImageRep {
-            let width = 1260, height = 560
+            let width = 1200, height = 90 + ((profiles.count+4)/5)*230
             let rep = NSBitmapImageRep(bitmapDataPlanes:nil,pixelsWide:width,pixelsHigh:height,bitsPerSample:8,samplesPerPixel:4,hasAlpha:true,isPlanar:false,colorSpaceName:.deviceRGB,bytesPerRow:0,bitsPerPixel:0)!
             let graphics = NSGraphicsContext(bitmapImageRep:rep)!
             NSGraphicsContext.saveGraphicsState(); NSGraphicsContext.current = graphics
@@ -21,29 +21,31 @@ extension BirdArt {
                 ctx.saveGState(); ctx.translateBy(x:x,y:y); ctx.scaleBy(x:1,y:-1)
                 (text as NSString).draw(at:.zero,withAttributes:[.font:NSFont.systemFont(ofSize:size,weight:.medium),.foregroundColor:NSColor.white]); ctx.restoreGState()
             }
-            label("上海窗边的鸟 · 成年体长比例",x:24,y:40,size:23)
-            label("上：站立 / 习性动作    下：飞行    展示为桌面默认尺寸的 2 倍",x:24,y:72,size:14)
+            label("啾啾 · 鸟种图鉴 / ChirpOS birds",x:24,y:40,size:23)
+            label("左：站立 / 习性动作 · 右：飞行 · 预览统一放大，实际体型按标注比例",x:24,y:72,size:14)
             for (i,p) in profiles.enumerated() {
-                let x = Double(i*180)+102, scale = p.relativeScale*2
+                let cellX = Double((i%5)*240), cellY = Double((i/5)*230)+90
+                let x = cellX+65, scale = 2.0
                 let bird = Bird(position:.zero,fraction:0.5,profile:p)
                 bird.perch(on:Surface(id:1,rect:CGRect(x:0,y:0,width:300,height:200)))
                 if let time { bird.tick(time) }
-                arts[i].draw(name:time == nil ? "stand":bird.frameName,at:CGPoint(x:x,y:232+bird.hopOffset*scale),scale:scale,right:true,context:ctx)
+                arts[i].draw(name:time == nil ? "stand":bird.frameName,at:CGPoint(x:x,y:cellY+100+bird.hopOffset*scale),scale:scale,right:true,context:ctx)
                 ctx.setStrokeColor(NSColor(calibratedWhite:0.5,alpha:0.4).cgColor); ctx.setLineWidth(1)
-                ctx.move(to:CGPoint(x:Double(i*180)+15,y:233)); ctx.addLine(to:CGPoint(x:Double(i*180)+165,y:233)); ctx.strokePath()
+                ctx.move(to:CGPoint(x:cellX+10,y:cellY+101)); ctx.addLine(to:CGPoint(x:cellX+110,y:cellY+101)); ctx.strokePath()
                 let phase = time.map { Int($0*p.flapFPS)%8 } ?? 2
-                arts[i].draw(name:"fly\(phase)",at:CGPoint(x:x,y:444),scale:scale,right:true,context:ctx)
-                label(p.name,x:Double(i*180)+28,y:496)
-                label(String(format:"%.1f cm · %.2f×",p.adultLengthCM,p.relativeScale),x:Double(i*180)+28,y:523,size:13)
+                arts[i].draw(name:"fly\(phase)",at:CGPoint(x:x+120,y:cellY+100),scale:scale,right:true,context:ctx)
+                label(p.name,x:cellX+16,y:cellY+145)
+                label(p.englishName ?? "",x:cellX+16,y:cellY+170,size:11)
+                label(String(format:"%.1f cm · %.2f×",p.adultLengthCM,p.relativeScale),x:cellX+16,y:cellY+198,size:13)
             }
             NSGraphicsContext.restoreGraphicsState()
             return rep
         }
         try render(time:nil).representation(using:.png,properties:[:])!.write(to:folder.appendingPathComponent("species-lineup.png"))
         let url = folder.appendingPathComponent("species-animations.gif")
-        guard let dest = CGImageDestinationCreateWithURL(url as CFURL,"com.compuserve.gif" as CFString,180,nil) else { throw NSError(domain:"Preview",code:1) }
+        guard let dest = CGImageDestinationCreateWithURL(url as CFURL,"com.compuserve.gif" as CFString,32,nil) else { throw NSError(domain:"Preview",code:1) }
         CGImageDestinationSetProperties(dest,[kCGImagePropertyGIFDictionary:[kCGImagePropertyGIFLoopCount:0]] as CFDictionary)
-        for f in 0..<180 {
+        for f in 0..<32 {
             CGImageDestinationAddImage(dest,render(time:Double(f)*0.05).cgImage!,[kCGImagePropertyGIFDictionary:[kCGImagePropertyGIFDelayTime:0.05,kCGImagePropertyGIFUnclampedDelayTime:0.05]] as CFDictionary)
         }
         guard CGImageDestinationFinalize(dest) else { throw NSError(domain:"Preview",code:2) }
@@ -59,6 +61,6 @@ extension BirdArt {
                 guard stride(from:3,to:bytes.count,by:4).filter({ bytes[$0] > 0 }).count > 100 else { throw NSError(domain:"Preview",code:5) }
             }
         }
-        print("Species art: PASS — 7 distinct birds, 126 nonempty frames, 56 distinct flight poses")
+        print("Species art: PASS — \(arts.count) distinct birds, \(arts.count*names.count) nonempty frames, \(arts.count*8) distinct flight poses")
     }
 }

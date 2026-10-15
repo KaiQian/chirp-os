@@ -4,9 +4,9 @@
 
 | 平台 / Platform | 最新版本 / Latest release |
 | --- | --- |
-| Windows · Intel / AMD 64-bit | [下载 ZIP · v0.3.3](https://github.com/billtt/chirp-os/releases/download/v0.3.3/ChirpOS-0.3.3-win-x64.zip) |
-| Windows · ARM64 / UTM | [下载 ZIP · v0.3.3](https://github.com/billtt/chirp-os/releases/download/v0.3.3/ChirpOS-0.3.3-win-arm64.zip) |
-| macOS · Apple Silicon | [下载 ZIP · v0.3.3](https://github.com/billtt/chirp-os/releases/download/v0.3.3/ChirpOS-0.3.3-macOS-arm64.zip) |
+| Windows · Intel / AMD 64-bit | [下载 ZIP · v0.4.0](https://github.com/billtt/chirp-os/releases/download/v0.4.0/ChirpOS-0.4.0-win-x64.zip) |
+| Windows · ARM64 / UTM | [下载 ZIP · v0.4.0](https://github.com/billtt/chirp-os/releases/download/v0.4.0/ChirpOS-0.4.0-win-arm64.zip) |
+| macOS · Apple Silicon | [下载 ZIP · v0.4.0](https://github.com/billtt/chirp-os/releases/download/v0.4.0/ChirpOS-0.4.0-macOS-arm64.zip) |
 
 [所有版本 / All releases](https://github.com/billtt/chirp-os/releases) · [简体中文](#中文) · [English](#english)
 
@@ -25,6 +25,9 @@
 - 小鸟随窗口缓慢移动，快速拖动时可能受惊飞走；前方窗口会遮住后方停留的小鸟。
 - 鸟群随机飞入、飞出，可设置数量范围，例如 3–5、8–12 或 15–20 只。
 - 自由调整每种鸟的出现概率并锁定；也可设置体长、振翅频率、飞速和停留时间。
+- 鼠标停在小鸟身上约 1 秒，头顶就会显示名字；点击仍会穿透。
+- 夜鹭会长时间守望、伸颈、抖毛，偶尔“挤洗手液”；大斑啄木鸟会沿窗口侧边停靠、啄击。
+- 菜单中的“鸟种测试”打开白底动画图鉴，网格展示全部鸟种与循环动作。
 - 支持中英文切换、暂停动画和随系统启动。
 
 ### 鸟种 / Bird species
@@ -38,6 +41,42 @@
 | 乌鸫 | Chinese Blackbird |
 | 鹊鸲 | Oriental Magpie-Robin |
 | 棕背伯劳 | Long-tailed Shrike |
+| 夜鹭 | Black-crowned Night Heron |
+| 红尾水鸲 | Plumbeous Water Redstart |
+| 白鹭 | Little Egret |
+| 苍鹭 | Grey Heron |
+| 红隼 | Common Kestrel |
+| 游隼 | Peregrine Falcon |
+| 黑鸢 | Black Kite |
+| 普通鵟 | Common Buzzard |
+| 喜鹊 | Oriental Magpie |
+| 灰喜鹊 | Azure-winged Magpie |
+| 大嘴乌鸦 | Large-billed Crow |
+| 戴胜 | Eurasian Hoopoe |
+| 家燕 | Barn Swallow |
+| 绿头鸭 | Mallard |
+| 噪鹃 | Asian Koel |
+| 暗绿绣眼鸟 | Swinhoe’s White-eye |
+| 红嘴鸥 | Black-headed Gull |
+| 中杓鹬 | Whimbrel |
+| 斑鱼狗 | Pied Kingfisher |
+| 丘鹬 | Eurasian Woodcock |
+| 黑卷尾 | Black Drongo |
+| 池鹭 | Chinese Pond Heron |
+| 白眉姬鹟 | Yellow-rumped Flycatcher |
+| 黄眉柳莺 | Yellow-browed Warbler |
+| 大山雀 | Great Tit |
+| 黑水鸡 | Common Moorhen |
+| 大斑啄木鸟 | Great Spotted Woodpecker |
+| 棕头鸦雀 | Vinous-throated Parrotbill |
+| 黑翅长脚鹬 | Black-winged Stilt |
+| 白骨顶 | Eurasian Coot |
+| 红嘴相思鸟 | Red-billed Leiothrix |
+| 黑领椋鸟 | Black-collared Starling |
+| 普通翠鸟 | Common Kingfisher |
+| 金眶鸻 | Little Ringed Plover |
+| 黑尾蜡嘴雀 | Yellow-billed Grosbeak |
+| 红胁蓝尾鸲 | Red-flanked Bluetail |
 
 ### 开始观鸟
 
@@ -47,11 +86,13 @@
 
 启动后稍等片刻，小鸟就会陆续飞入。点击 macOS 菜单栏或右键点击 Windows 系统托盘中的小鸟图标，即可调整设置或退出。Windows 图标可能位于托盘的隐藏图标区域。更新前请先退出正在运行的版本。
 
+启动时发现新增鸟种，会询问是恢复所有默认概率、按新旧鸟种数量比例分配，还是保留原概率并手动设置。手动模式会直接定位到第一种新鸟；按数量分配会缩放锁定项，但保留锁定状态。体型按成年鸟代表体长进行非线性缩放（红耳鹎 1×、苍鹭 2.5×），部分配色采用雄鸟或繁殖羽；动作经过像素化简化。
+
 macOS 版本使用 Developer ID 签名并经过 Apple 公证。Windows 版本尚未使用发布者证书签名，首次打开可能遇到系统安全提示。
 
 ### 隐私与反馈
 
-啾啾在本机运行，仅读取窗口位置和前后顺序等信息，不读取窗口标题或内容，也不上传数据。窗口遮挡按矩形估算，透明窗口、圆角和特殊系统界面的效果可能有所不同。
+啾啾在本机运行，仅读取窗口位置、前后顺序和用于悬停识别的鼠标位置，不读取窗口标题或内容，也不上传数据。窗口遮挡按矩形估算，透明窗口、圆角和特殊系统界面的效果可能有所不同。
 
 遇到问题或有新点子，欢迎提交 [Issue](https://github.com/billtt/chirp-os/issues)。想自己构建或贡献代码，请看[开发指南](docs/DEVELOPMENT.md)。
 
@@ -65,6 +106,9 @@ ChirpOS brings pixel-art birds to your macOS or Windows desktop. They fly in fro
 - Birds follow gently moved windows and may startle when dragged quickly. Foreground windows hide birds perched behind them.
 - Birds arrive and leave at random, with configurable population ranges such as 3–5, 8–12, or 15–20.
 - Adjust and lock arrival probabilities, and customize size, wingbeat rate, speed, and perch duration.
+- Hover over a bird for about 1 second to see its name, with clicks still passing through.
+- Night herons watch, stretch, shake and occasionally leave a fleeting dropping; woodpeckers cling to and peck window sides.
+- Open “Bird test” from the menu for a white-background grid of all species cycling through their animations.
 - Chinese and English menus, animation pause, and launch at login.
 
 ### Get started
@@ -75,11 +119,13 @@ ChirpOS brings pixel-art birds to your macOS or Windows desktop. They fly in fro
 
 Birds begin arriving shortly after launch. Use the macOS menu bar icon or right-click the Windows tray icon for settings and quit. The Windows icon may be in the hidden-icons area. Quit the running version before updating.
 
+When new species are detected at startup, choose default probabilities, allocation by species count, or manual configuration. Manual mode jumps to the first new species. Count-based allocation scales locked values but retains their lock state. Sizes use compressed adult-length ratios (bulbul 1×, Grey Heron 2.5×); some designs show males or breeding plumage, with stylized pixel animation.
+
 The macOS app is Developer ID-signed and notarized by Apple. Windows builds are not publisher-signed, so a system security prompt may appear on first launch.
 
 ### Privacy & feedback
 
-ChirpOS runs locally. It reads window geometry and stacking order, not window titles or content, and uploads no data. Occlusion uses rectangular bounds; transparent windows, rounded corners, and special system views may look different.
+ChirpOS runs locally. It reads window geometry, stacking order and pointer position for hover identification, not window titles or content, and uploads no data. Occlusion uses rectangular bounds; transparent windows, rounded corners, and special system views may look different.
 
 Report a bug or suggest an idea in [Issues](https://github.com/billtt/chirp-os/issues). For building and contributing, see the [development guide](docs/DEVELOPMENT.md).
 

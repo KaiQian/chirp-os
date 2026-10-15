@@ -2,8 +2,8 @@ using System.Text.Json;
 namespace ChirpOS.Core;
 
 public record Species(string Id, string Name, double AdultLengthCM, double Weight, double FlapFPS,
-                      double Speed, double PerchMin, double PerchMax) {
-    public double Scale => AdultLengthCM / 19;
+                      double Speed, double PerchMin, double PerchMax, string? EnglishName=null) {
+    public double Scale => Math.Pow(AdultLengthCM / 19, Math.Log(2.5) / Math.Log(94d / 19));
 }
 public record Catalog(Species[] Species);
 public readonly record struct V(double X, double Y) {
@@ -36,14 +36,26 @@ public static class Geometry {
         }
         return ranges.Where(r=>r.Hi-r.Lo>.01).ToList();
     }
-    public static V Foot(Surface s,double fraction) {var m=Math.Min(42,s.Rect.W/3);return new(s.Rect.X+m+(s.Rect.W-2*m)*Math.Clamp(fraction,0,1),s.Rect.Y);}
+    public static List<(double Lo,double Hi)> SideRanges(Surface host,PerchEdge edge,IReadOnlyList<Surface> surfaces,Box screen,double scale,IReadOnlyList<Box> occupied) {
+        var depth=surfaces.ToList().FindIndex(s=>s.Id==host.Id);var x=edge==PerchEdge.Left?host.Rect.X:host.Rect.Right;
+        if(depth<0 || x-29*scale<screen.X || x+29*scale>screen.Right)return [];
+        var lo=Math.Max(host.Rect.Y+42,screen.Y+39*scale);var hi=Math.Min(host.Rect.Bottom-42,screen.Bottom-9*scale);
+        if(hi<=lo)return [];var ranges=new List<(double Lo,double Hi)>{(lo,hi)};
+        foreach(var r in surfaces.Take(depth).Select(s=>s.Rect).Concat(occupied)) {
+            if(r.Right<=x-29*scale || r.X>=x+29*scale)continue;var a=r.Y-9*scale;var b=r.Bottom+39*scale;
+            var next=new List<(double Lo,double Hi)>();foreach(var q in ranges){if(b<=q.Lo || a>=q.Hi){next.Add(q);continue;}if(a>q.Lo)next.Add((q.Lo,a));if(b<q.Hi)next.Add((b,q.Hi));}ranges=next;
+        }return ranges.Where(q=>q.Hi-q.Lo>.01).ToList();
+    }
+    public static V Foot(Surface s,double fraction,PerchEdge edge=PerchEdge.Top) {if(edge!=PerchEdge.Top)return new(edge==PerchEdge.Left?s.Rect.X:s.Rect.Right,s.Rect.Y+42+Math.Max(0,s.Rect.H-84)*Math.Clamp(fraction,0,1));var m=Math.Min(42,s.Rect.W/3);return new(s.Rect.X+m+(s.Rect.W-2*m)*Math.Clamp(fraction,0,1),s.Rect.Y);}
     public static Box Landing(V p,double scale)=>new(p.X-29*scale,p.Y-39*scale,58*scale,48*scale);
     public static bool Visible(long id,V p,IReadOnlyList<Surface> surfaces,double scale) {
         foreach(var s in surfaces) {if(s.Id==id)return true;if(s.Rect.Intersects(Landing(p,scale)))return false;}return false;
     }
 }
+public enum PerchEdge { Top, Left, Right }
 public enum BirdState { Flying, Landing, Perched }
 public sealed class Bird(Species species,V position,Random rng) {
+    public PerchEdge Edge {get;set;}
     public Species Species {get;}=species;
     public V Position {get;private set;}=position;
     public BirdState State {get;private set;}=BirdState.Flying;
@@ -62,17 +74,17 @@ public sealed class Bird(Species species,V position,Random rng) {
         duration=Math.Max(.3,seconds)/(2*Species.Speed);arc=height;flightAge=0;Age=0;State=BirdState.Flying;invalid=false;Departing=departing;
     }
     public void Flee(){Startles++;Fly(new(Position.X+(Right?210:-210),Position.Y-100),null,1.25,45);}
-    public void Perch(Surface s){Host=Depth=s.Id;previous=s.Rect;Position=Geometry.Foot(s,Fraction);State=BirdState.Perched;Age=0;invalid=false;}
+    public void Perch(Surface s){Host=Depth=s.Id;previous=s.Rect;Position=Geometry.Foot(s,Fraction,Edge);State=BirdState.Perched;Age=0;invalid=false;if(Edge!=PerchEdge.Top)Right=Edge==PerchEdge.Left;}
     public void UpdateHost(IReadOnlyList<Surface> surfaces,double dt,double scale) {
         if(Host==null)return;var host=surfaces.FirstOrDefault(s=>s.Id==Host);
-        if(host==null){Flee();return;}var point=Geometry.Foot(host,Fraction);
+        if(host==null){Flee();return;}var point=Geometry.Foot(host,Fraction,Edge);
         if(State==BirdState.Flying && !Geometry.Visible(host.Id,point,surfaces,scale)) {Host=Depth=null;previous=null;invalid=true;return;}
         if(State!=BirdState.Flying){if(previous is Box old){var delta=V.Distance(new(old.X,old.Y),new(host.Rect.X,host.Rect.Y));if(dt<.2 && delta>8 && delta/Math.Max(.016,dt)>950){Flee();return;}Followed+=V.Distance(Position,point);}Position=point;}else target=point;
         previous=host.Rect;
     }
     public void Tick(double dt) {
         if(invalid)return;Age+=dt;
-        if(State==BirdState.Flying){flightAge+=dt;var t=Math.Min(1,flightAge/duration);var u=t*t*(3-2*t);var next=new V(origin.X+(target.X-origin.X)*u,origin.Y+(target.Y-origin.Y)*u-Math.Sin(t*Math.PI)*arc);if(Math.Abs(next.X-Position.X)>.05)Right=next.X>Position.X;Position=next;if(t>=1 && Host!=null){Depth=Host;State=BirdState.Landing;Age=0;Landings++;}}
+        if(State==BirdState.Flying){flightAge+=dt;var t=Math.Min(1,flightAge/duration);var u=t*t*(3-2*t);var next=new V(origin.X+(target.X-origin.X)*u,origin.Y+(target.Y-origin.Y)*u-Math.Sin(t*Math.PI)*arc);if(Math.Abs(next.X-Position.X)>.05)Right=next.X>Position.X;Position=next;if(t>=1 && Host!=null){Depth=Host;State=BirdState.Landing;Age=0;Landings++;if(Edge!=PerchEdge.Top)Right=Edge==PerchEdge.Left;}}
         else if(State==BirdState.Landing && Age>.42){State=BirdState.Perched;Age=0;}
     }
     public IEnumerable<Box> Blockers(IReadOnlyList<Surface> surfaces) {
@@ -82,7 +94,9 @@ public sealed class Bird(Species species,V position,Random rng) {
     public double Hop {get {var c=Age%9;return State==BirdState.Perched && Species.Id=="treeSparrow" && c>1 && c<2?-Math.Abs(Math.Sin((c-1)*Math.PI*2))*3:0;}}
     public string Frame {get {
         if(State==BirdState.Flying)return "fly"+((int)(Age*Species.FlapFPS)%8);
+        if(State==BirdState.Landing && Edge!=PerchEdge.Top)return "cling0";
         if(State==BirdState.Landing)return "land"+Math.Min(2,(int)(Age/.14));
+        var special=SpeciesBehavior.Frame(Species.Id,Age,Edge!=PerchEdge.Top);if(special!=null)return special;
         var c=Age%9;var pose=Species.Id switch {
             "treeSparrow" when c>1 && c<2 => (int)(c*6)%2,
             "spottedDove" when c>2 && c<4 => (int)(c*2.5)%2,
@@ -106,9 +120,9 @@ public sealed class Probabilities {
     }
     public int Choose(Random rng){var ticket=rng.Next(10000);for(var i=0;i<Points.Length;i++){ticket-=Points[i];if(ticket<0)return i;}throw new InvalidOperationException("Invalid probabilities");}
 }
-public sealed record Behavior(double AdultLengthCM, double FlapFPS, double Speed, double PerchMin, double PerchMax) {
+public sealed record Behavior(double AdultLengthCM, double FlapFPS, double Speed, double PerchMin, double PerchMax, string? EnglishName=null) {
     public static Behavior From(Species s) => new(s.AdultLengthCM,s.FlapFPS,s.Speed,s.PerchMin,s.PerchMax);
-    public bool Valid => double.IsFinite(AdultLengthCM) && AdultLengthCM is >=10 and <=40 &&
+    public bool Valid => double.IsFinite(AdultLengthCM) && AdultLengthCM is >=8 and <=110 &&
         double.IsFinite(FlapFPS) && FlapFPS is >=4 and <=60 && double.IsFinite(Speed) && Speed is >=.5 and <=2 &&
         double.IsFinite(PerchMin) && PerchMin is >=2 and <=300 && double.IsFinite(PerchMax) && PerchMax>=PerchMin && PerchMax<=600;
     public Species Apply(Species s) => s with { AdultLengthCM=AdultLengthCM, FlapFPS=FlapFPS, Speed=Speed, PerchMin=PerchMin, PerchMax=PerchMax };
@@ -131,6 +145,27 @@ public sealed class Preferences {
     public bool English {get;set;} public double Scale {get;set;}=1;
     public Probabilities Probability {get;set;}=new();
     public Dictionary<string,Behavior> Behaviors {get;set;}=new();
+    public string[]? SpeciesIds {get;set;}
+    public string[]? PendingSpeciesIds {get;set;}
+    public void AllocateNewSpecies(Species[] species) {
+        var fresh=(PendingSpeciesIds ?? []).ToHashSet();
+        var added=Enumerable.Range(0,species.Length).Where(i=>fresh.Contains(species[i].Id)).ToArray();
+        var old=Enumerable.Range(0,species.Length).Where(i=>!fresh.Contains(species[i].Id)).ToArray();
+        if(added.Length==0)return;
+        var budget=(int)Math.Round(10000d*added.Length/species.Length,MidpointRounding.AwayFromZero);
+        var a=Probabilities.Apportion(budget,added.Select(i=>species[i].Weight).ToArray());
+        var b=Probabilities.Apportion(10000-budget,old.Select(i=>(double)Probability.Points[i]).ToArray());
+        for(var j=0;j<added.Length;j++)Probability.Points[added[j]]=a[j];
+        for(var j=0;j<old.Length;j++)Probability.Points[old[j]]=b[j];
+    }
+    public bool Migrate(Species[] species) {
+        var ids=SpeciesIds ?? new[]{"redWhiskeredBulbul","treeSparrow","lightVentedBulbul","spottedDove","chineseBlackbird","magpieRobin","longTailedShrike"};
+        if (!Probability.Valid(ids.Length) || ids.Distinct().Count()!=ids.Length || ids.Any(id=>!species.Any(s=>s.Id==id))) return false;
+        PendingSpeciesIds=species.Where(s=>!ids.Contains(s.Id) || (PendingSpeciesIds ?? []).Contains(s.Id)).Select(s=>s.Id).ToArray();
+        var points=new int[species.Length]; var locks=new bool[species.Length];
+        for(var i=0;i<ids.Length;i++){var j=Array.FindIndex(species,s=>s.Id==ids[i]);points[j]=Probability.Points[i];locks[j]=Probability.Locked[i];}
+        Probability=new(){Points=points,Locked=locks}; SpeciesIds=species.Select(s=>s.Id).ToArray(); return true;
+    }
     public Species Resolve(Species s)=>Behaviors.TryGetValue(s.Id,out var behavior)?behavior.Apply(s):s;
     public bool Valid(int count)=>Minimum>=1 && Maximum>=Minimum && Maximum<=50 && (Scale==1 || Scale==1.5) && Probability != null && Probability.Valid(count) && Behaviors != null && Behaviors.Values.All(b=>b != null && b.Valid);
 }

@@ -29,6 +29,11 @@ final class SpeciesSettingsWindow: NSWindowController, NSTextFieldDelegate {
     func button(_ title:String,_ action:Selector,_ rect:NSRect,in view:NSView) -> NSButton {
         let b = NSButton(title:title,target:self,action:action); b.bezelStyle = .rounded; b.frame = rect; view.addSubview(b); return b
     }
+    func scroll(_ content:NSView) -> NSScrollView {
+        let view=NSScrollView(frame:NSRect(x:0,y:0,width:780,height:446))
+        view.hasVerticalScroller=true; view.documentView=content
+        return view
+    }
     func build() {
         let selected = tabs?.indexOfTabViewItem(tabs!.selectedTabViewItem!) ?? 0
         sliders=[]; fields=[]; locks=[]; detailFields=[]
@@ -39,8 +44,8 @@ final class SpeciesSettingsWindow: NSWindowController, NSTextFieldDelegate {
         let probabilityButton=button(t("出现概率","Arrival probabilities"),#selector(selectPage(_:)),NSRect(x:235,y:112,width:185,height:30),in:root); probabilityButton.tag=0
         let behaviorButton=button(t("体型与动作","Size & behavior"),#selector(selectPage(_:)),NSRect(x:430,y:112,width:175,height:30),in:root); behaviorButton.tag=1
         tabs = NSTabView(frame:NSRect(x:30,y:150,width:780,height:446)); tabs.tabViewType = .noTabsNoBorder; root.addSubview(tabs)
-        let probabilityView = SettingsContentView(frame:NSRect(x:0,y:0,width:774,height:445))
-        let first = NSTabViewItem(identifier:"probabilities"); first.label=t("出现概率","Arrival probabilities"); first.view=probabilityView; tabs.addTabViewItem(first)
+        let probabilityView = SettingsContentView(frame:NSRect(x:0,y:0,width:754,height:CGFloat(110+draft.catalog.species.count*47)))
+        let first = NSTabViewItem(identifier:"probabilities"); first.label=t("出现概率","Arrival probabilities"); first.view=scroll(probabilityView); tabs.addTabViewItem(first)
         label(t("鸟种","Species"),NSRect(x:20,y:14,width:240,height:23),in:probabilityView)
         label(t("概率（%）","Probability (%)"),NSRect(x:294,y:14,width:305,height:23),in:probabilityView)
         for (i,entry) in draft.probabilities.entries.enumerated() {
@@ -57,9 +62,9 @@ final class SpeciesSettingsWindow: NSWindowController, NSTextFieldDelegate {
             let lock = NSButton(checkboxWithTitle:t("锁定","Lock"),target:self,action:#selector(lockChanged(_:)))
             lock.tag=i; lock.frame=NSRect(x:657,y:y+7,width:95,height:25); probabilityView.addSubview(lock); locks.append(lock)
         }
-        label(t("总计 100.00% · 锁定项不变；其他未锁定项按原比例分配，均为零时平均分配。\n默认值参考上海观测，部分鸟种为估计值。","Total 100.00% · Locked values stay fixed. Other unlocked values redistribute proportionally, or equally when all are zero. Defaults use Shanghai observations and some estimates."),NSRect(x:20,y:383,width:730,height:54),in:probabilityView,size:12)
+        label(t("总计 100.00% · 锁定项不变；其他未锁定项按原比例分配，均为零时平均分配。\n默认频率用于游戏；新增鸟种可在启动提示中选择分配方式。","Total 100.00% · Locked values stay fixed. Other unlocked values redistribute proportionally, or equally when all are zero. Game defaults are estimates. Choose how to allocate new species in the startup prompt."),NSRect(x:20,y:CGFloat(52+draft.catalog.species.count*47),width:710,height:54),in:probabilityView,size:12)
         let detailView = SettingsContentView(frame:probabilityView.frame)
-        let second = NSTabViewItem(identifier:"behavior"); second.label=t("体型与动作","Size & behavior"); second.view=detailView; tabs.addTabViewItem(second)
+        let second = NSTabViewItem(identifier:"behavior"); second.label=t("体型与动作","Size & behavior"); second.view=scroll(detailView); tabs.addTabViewItem(second)
         let titles = [t("体长 cm","Length cm"),t("振翅 次/秒","Beats / sec"),t("飞速 倍率","Speed ×"),t("最短停留 秒","Min perch s"),t("最长停留 秒","Max perch s")]
         label(t("鸟种","Species"),NSRect(x:20,y:14,width:235,height:25),in:detailView)
         for (j,title) in titles.enumerated() { label(title,NSRect(x:270+j*97,y:14,width:95,height:30),in:detailView,size:11) }
@@ -73,7 +78,7 @@ final class SpeciesSettingsWindow: NSWindowController, NSTextFieldDelegate {
             }
             detailFields.append(row)
         }
-        label(t("体长以成年鸟为参考；振翅和停留时长是动画参数，可按喜好调整。\n体长 10–40 cm · 振翅 0.5–7.5 次/秒 · 飞速 0.5–2× · 最短 2–300 秒 · 最长不超过 600 秒。","Adult body length sets relative size; animation timing is adjustable.\nLength 10–40 cm · Beats 0.5–7.5/s · Speed 0.5–2× · Minimum perch 2–300s · Maximum ≤600s."),NSRect(x:20,y:383,width:735,height:55),in:detailView,size:12)
+        label(t("体长以成年鸟为参考；振翅和停留时长是动画参数，可按喜好调整。\n体长 8–110 cm · 振翅 0.5–7.5 次/秒 · 飞速 0.5–2× · 最短 2–300 秒 · 最长不超过 600 秒。","Adult body length sets relative size; animation timing is adjustable.\nLength 8–110 cm · Beats 0.5–7.5/s · Speed 0.5–2× · Minimum perch 2–300s · Maximum ≤600s."),NSRect(x:20,y:CGFloat(52+draft.catalog.species.count*45),width:715,height:55),in:detailView,size:12)
         tabs.selectTabViewItem(at:min(selected,1))
         message=label("",NSRect(x:26,y:603,width:784,height:28),in:root,size:12)
         _=button(t("恢复默认","Restore Defaults"),#selector(resetDefaults),NSRect(x:22,y:642,width:148,height:30),in:root)
@@ -82,6 +87,14 @@ final class SpeciesSettingsWindow: NSWindowController, NSTextFieldDelegate {
         refresh()
     }
     @objc func selectPage(_ sender:NSButton) { window?.makeFirstResponder(nil); tabs.selectTabViewItem(at:sender.tag) }
+    func scrollToSpecies(_ id:SpeciesID) {
+        guard let i=draft.probabilities.entries.firstIndex(where:{$0.id==id}),
+              let scroll=tabs.tabViewItems[0].view as? NSScrollView else{return}
+        tabs.selectTabViewItem(at:0)
+        scroll.contentView.scroll(to:CGPoint(x:0,y:max(0,fields[i].frame.minY-45)))
+        scroll.reflectScrolledClipView(scroll.contentView)
+        window?.makeFirstResponder(fields[i])
+    }
     func refresh() {
         for (i,e) in draft.probabilities.entries.enumerated() {
             sliders[i].doubleValue=Double(e.points)/100; fields[i].stringValue=String(format:"%.2f",Double(e.points)/100)
@@ -124,7 +137,7 @@ final class SpeciesSettingsWindow: NSWindowController, NSTextFieldDelegate {
             let row=detailFields[i], values=row.map { number($0.stringValue) }
             guard values.allSatisfy({$0?.isFinite == true}) else { return false }
             let v=values.map{$0!}
-            guard (10...40).contains(v[0]), (0.5...7.5).contains(v[1]), (0.5...2).contains(v[2]), (2...300).contains(v[3]), v[4]>=v[3],v[4]<=600 else { return false }
+            guard (8...110).contains(v[0]), (0.5...7.5).contains(v[1]), (0.5...2).contains(v[2]), (2...300).contains(v[3]), v[4]>=v[3],v[4]<=600 else { return false }
             let index=draft.catalog.species.firstIndex{$0.id==entry.id}!
             catalog.species[index].adultLengthCM=v[0]; catalog.species[index].flapFPS=v[1]*8
             catalog.species[index].speed=v[2]; catalog.species[index].perchMin=v[3]; catalog.species[index].perchMax=v[4]

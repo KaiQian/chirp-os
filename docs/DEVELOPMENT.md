@@ -30,6 +30,7 @@ Requires macOS 13+ and Swift Command Line Tools. Builds target the host architec
 ./scripts/verify-desktop.sh
 ./scripts/verify-population.sh
 ./scripts/verify-settings.sh
+.build/release/Birding --verify-birds .build/bird-check
 ```
 
 ## Windows
@@ -64,13 +65,16 @@ Windows 桌面检查 / Windows desktop checks: run `ChirpOS.exe --self-test`, or
 
 ## 美术 / Artwork
 
-像素绘制定义位于 `platforms/macos/Sources/Birding/PixelArt.swift` 和 `SpeciesArt.swift`。修改后在 Mac 上导出共用资源，并提交 `shared/` 的变化。
-Artwork is defined in `platforms/macos/Sources/Birding/PixelArt.swift` and `SpeciesArt.swift`. Export on Mac after editing, and commit the updated `shared/` assets.
+像素绘制定义位于 `platforms/macos/Sources/Birding/PixelArt.swift` 、`SpeciesArt.swift` 和 `DetailedBirdArt.swift`。修改后在 Mac 上导出共用资源，并提交 `shared/` 的变化。
+Artwork is defined in `platforms/macos/Sources/Birding/PixelArt.swift` `SpeciesArt.swift` and `DetailedBirdArt.swift`. Export on Mac after editing, and commit the updated `shared/` assets.
 
 ```bash
 ./scripts/export-shared.sh
 ./scripts/preview-species.sh
 ```
+
+鸟种外形、行为参考及配置兼容说明见 [Bird design](BIRD-DESIGN.md)。
+See [Bird design](BIRD-DESIGN.md) for appearance, behavior references and configuration compatibility.
 
 ## 本地数据 / Local data
 

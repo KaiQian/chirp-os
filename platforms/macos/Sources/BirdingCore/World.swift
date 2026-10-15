@@ -61,6 +61,33 @@ public enum Geometry {
         }
         return ranges.filter { $0.upperBound - $0.lowerBound > 0.01 }
     }
+    public static func foot(on host:Surface, fraction:CGFloat, edge:PerchEdge) -> CGPoint {
+        if edge == .top { return CGPoint(x:perchX(fraction,rect:host.rect),y:host.rect.minY) }
+        return CGPoint(x:edge == .left ? host.rect.minX:host.rect.maxX,
+                       y:host.rect.minY+42+max(0,host.rect.height-84)*min(1,max(0,fraction)))
+    }
+    public static func sideRanges(on host:Surface, edge:PerchEdge, surfaces:[Surface], screen:CGRect,
+                                  scale:CGFloat, occupied:[CGRect]) -> [ClosedRange<CGFloat>] {
+        guard let depth=surfaces.firstIndex(where:{$0.id==host.id}) else { return [] }
+        let x=edge == .left ? host.rect.minX:host.rect.maxX
+        guard x-29*scale >= screen.minX, x+29*scale <= screen.maxX else { return [] }
+        let lo=max(host.rect.minY+42,screen.minY+39*scale)
+        let hi=min(host.rect.maxY-42,screen.maxY-9*scale)
+        guard hi>lo else { return [] }
+        var ranges=[lo...hi]
+        for r in surfaces.prefix(depth).map(\.rect)+occupied {
+            guard r.maxX>x-29*scale, r.minX<x+29*scale else {continue}
+            let a=r.minY-9*scale,b=r.maxY+39*scale
+            ranges=ranges.flatMap { q -> [ClosedRange<CGFloat>] in
+                if b<=q.lowerBound || a>=q.upperBound {return [q]}
+                var result:[ClosedRange<CGFloat>]=[]
+                if a>q.lowerBound {result.append(q.lowerBound...a)}
+                if b<q.upperBound {result.append(b...q.upperBound)}
+                return result
+            }
+        }
+        return ranges.filter{$0.upperBound-$0.lowerBound>0.01}
+    }
     public static func quartz(_ cocoa: CGRect, primaryHeight: CGFloat) -> CGRect {
         CGRect(x: cocoa.minX, y: primaryHeight - cocoa.maxY, width: cocoa.width, height: cocoa.height)
     }
@@ -71,10 +98,13 @@ public enum Geometry {
     }
 }
 
+public enum PerchEdge { case top, left, right }
+
 public enum BirdState: String { case flying, landing, perched }
 public final class Bird {
     public static let flightSpeedMultiplier: Double = 2
     public private(set) var isDeparting = false
+    public var edge: PerchEdge = .top
     public let profile: SpeciesProfile
     public var position: CGPoint
     public var state: BirdState = .flying
@@ -114,8 +144,9 @@ public final class Bird {
     public var departureFinished: Bool { isDeparting && flightAge >= flightDuration }
     public func perch(on host: Surface) {
         hostID = host.id; depthID = host.id; previousHost = host.rect
-        position = CGPoint(x: Geometry.perchX(fraction, rect: host.rect), y: host.rect.minY)
+        position = Geometry.foot(on:host,fraction:fraction,edge:edge)
         state = .perched; stateTime = 0; destinationInvalidated = false
+        if edge != .top { facingRight = edge == .left }
     }
     public func flee() {
         startledCount += 1
@@ -125,7 +156,7 @@ public final class Bird {
     public func updateHost(surfaces: [Surface], sampleDT: Double, spriteScale: CGFloat = 1) {
         guard let id = hostID else { return }
         guard let host = surfaces.first(where: { $0.id == id }) else { flee(); return }
-        let point = CGPoint(x: Geometry.perchX(fraction, rect: host.rect), y: host.rect.minY)
+        let point = Geometry.foot(on:host,fraction:fraction,edge:edge)
         if state == .flying && !Geometry.isLandingVisible(on: id, at: point, surfaces: surfaces, scale: spriteScale) {
             // Stay exactly where we are until the controller chooses a new route.
             // This is a blocked destination, not a startle or an instantaneous landing.
@@ -161,6 +192,7 @@ public final class Bird {
                 // Only adopt the host's depth once the feet have reached its top edge.
                 depthID = hostID
                 state = .landing; stateTime = 0; landedCount += 1
+                if edge != .top { facingRight = edge == .left }
             }
         } else if state == .landing && stateTime > 0.42 {
             state = .perched; stateTime = 0
@@ -186,8 +218,9 @@ public final class Bird {
     public var frameName: String {
         switch state {
         case .flying: return "fly\(Int(stateTime * profile.flapFPS) % 8)"
-        case .landing: return "land\(min(2, Int(stateTime / 0.14)))"
+        case .landing: if edge != .top { return "cling0" }; return "land\(min(2, Int(stateTime / 0.14)))"
         case .perched:
+            if let frame=SpeciesBehavior.frame(profile.id,age:stateTime,side:edge != .top) { return frame }
             let cycle = stateTime.truncatingRemainder(dividingBy: 9)
             switch profile.id {
             case .treeSparrow:

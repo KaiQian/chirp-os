@@ -29,11 +29,12 @@ final class SpeciesTests: XCTestCase {
     }
     func testAdultLengthRatiosAndLandingClearance() {
         let c = SpeciesCatalog.standard
+        XCTAssertEqual(c.profile(.greyHeron).relativeScale,2.5,accuracy:0.000001)
         XCTAssertEqual(c.profile(.redWhiskeredBulbul).relativeScale,1)
         XCTAssertEqual(c.profile(.lightVentedBulbul).relativeScale,1)
-        XCTAssertEqual(c.profile(.spottedDove).relativeScale,31/19.0,accuracy:0.0001)
+        XCTAssertEqual(c.profile(.spottedDove).relativeScale,pow(31/19.0,log(2.5)/log(94/19.0)),accuracy:0.0001)
         let host = Surface(id:1,rect:CGRect(x:0,y:300,width:600,height:200))
-        let cover = Surface(id:2,rect:CGRect(x:335,y:240,width:100,height:100))
+        let cover = Surface(id:2,rect:CGRect(x:333,y:240,width:100,height:100))
         let foot = CGPoint(x:300,y:300)
         XCTAssertTrue(Geometry.isLandingVisible(on:1,at:foot,surfaces:[cover,host],scale:c.profile(.treeSparrow).relativeScale))
         XCTAssertFalse(Geometry.isLandingVisible(on:1,at:foot,surfaces:[cover,host],scale:c.profile(.spottedDove).relativeScale))
@@ -47,7 +48,7 @@ final class SpeciesTests: XCTestCase {
             XCTAssertEqual(b.flightDuration,2/p.speed,accuracy:0.0001)
             b.tick(0.21); XCTAssertEqual(b.frameName,"fly\(Int(0.21*p.flapFPS)%8)")
             b.perch(on:host); b.tick(p.id == .treeSparrow ? 1.2 : 2.2)
-            if p.id != .redWhiskeredBulbul && p.id != .lightVentedBulbul { XCTAssertTrue(b.frameName.hasPrefix("idle")) }
+            if [.treeSparrow,.spottedDove,.chineseBlackbird,.magpieRobin,.longTailedShrike].contains(p.id) { XCTAssertTrue(b.frameName.hasPrefix("idle")) }
             if p.id == .treeSparrow { XCTAssertLessThan(b.hopOffset,0) } else { XCTAssertEqual(b.hopOffset,0) }
         }
     }

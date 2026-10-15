@@ -20,12 +20,28 @@ internal sealed class Overlay : Form
             foreach (var r in bird.Blockers(surfaces)) region.Exclude(new RectangleF((float)(r.X - x), (float)(r.Y - y), (float)r.W, (float)r.H));
             g.SetClip(region, CombineMode.Replace);
             if (!bird.Right) { g.TranslateTransform(size, 0); g.ScaleTransform(-1, 1); }
-            g.DrawImage(atlas, new Rectangle(0, 0, size, size), new Rectangle(frame * 48, 0, 48, 48), GraphicsUnit.Pixel);
+            g.DrawImage(atlas, new Rectangle(0, 0, size, size), new Rectangle(frame * atlas.Height, 0, atlas.Height, atlas.Height), GraphicsUnit.Pixel);
         }
+        Present(bitmap,x,y);
+    }
+    public void RenderName(string name,V foot,double scale,int topPixel) {
+        using var font=new Font("Segoe UI",10);
+        var measured=TextRenderer.MeasureText(name,font);
+        var screen=Screen.FromPoint(new((int)foot.X,(int)foot.Y)).WorkingArea;
+        var width=Math.Min(screen.Width,measured.Width+20);var height=measured.Height+8;
+        using var bitmap=new Bitmap(width,height,PixelFormat.Format32bppPArgb);
+        using(var g=Graphics.FromImage(bitmap)) {
+            g.Clear(Color.FromArgb(220,25,27,31));
+            g.TextRenderingHint=System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+            g.DrawString(name,font,Brushes.White,8,3);
+        }
+        Present(bitmap,Math.Clamp((int)foot.X-width/2,screen.Left,screen.Right-width),Math.Max(screen.Top,(int)(foot.Y+(topPixel-39)*scale)-height-5));
+    }
+    void Present(Bitmap bitmap,int x,int y) {
         var screenDc = Native.GetDC(0); var memoryDc = Native.CreateCompatibleDC(screenDc); var hb = bitmap.GetHbitmap(Color.FromArgb(0)); var old = Native.SelectObject(memoryDc, hb);
         try
         {
-            var location = new Native.Point(x, y); var dimensions = new Native.Size(size, size); var source = new Native.Point(0, 0); var blend = new Native.Blend { Alpha = 255, Format = 1 };
+            var location = new Native.Point(x, y); var dimensions = new Native.Size(bitmap.Width, bitmap.Height); var source = new Native.Point(0, 0); var blend = new Native.Blend { Alpha = 255, Format = 1 };
             if (!Native.UpdateLayeredWindow(Handle, screenDc, ref location, ref dimensions, memoryDc, ref source, 0, ref blend, 2)) throw new System.ComponentModel.Win32Exception();
             if (!Visible) Show();
             Native.SetWindowPos(Handle, (nint)(-1), 0, 0, 0, 0, 0x1 | 0x2 | 0x10 | 0x40);

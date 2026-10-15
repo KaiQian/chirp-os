@@ -27,7 +27,11 @@ enum SettingsVerification {
             checks["loginExternalChangeRefreshes"] = d.loginItem?.state == .on
             d.showSpeciesSettings()
             let w=d.settingsWindow!
-            checks["sevenEditableRows"] = w.sliders.count == 7 && w.fields.count == 7 && w.locks.count == 7
+            checks["allSpeciesEditable"] = w.sliders.count == SpeciesID.allCases.count && w.fields.count == SpeciesID.allCases.count && w.locks.count == SpeciesID.allCases.count
+            let last=w.sliders.count-1
+            w.sliders[last].doubleValue=3;w.sliderChanged(w.sliders[last])
+            checks["lastSpeciesEditable"] = w.draft.probabilities.entries[last].points == 300
+            checks["scrollableSpeciesPages"] = w.tabs.tabViewItems.allSatisfy { ($0.view as? NSScrollView)?.hasVerticalScroller == true }
             w.sliders[0].doubleValue=35;w.sliderChanged(w.sliders[0])
             checks["sliderUpdatesPercentAndTotal"] = w.fields[0].stringValue == "35.00" && w.draft.probabilities.isValid
             w.locks[0].performClick(nil)
@@ -63,9 +67,31 @@ enum SettingsVerification {
             try snapshot(w.window!,to:folder.appendingPathComponent("settings-zh.png"))
             for i in w.locks.indices where w.locks[i].state == .off { w.locks[i].performClick(nil) }
             checks["allLockedDisablesAllEditors"] = w.sliders.allSatisfy{!$0.isEnabled} && w.fields.allSatisfy{!$0.isEnabled}
+            if let scroll=w.tabs.tabViewItems[0].view as? NSScrollView, let doc=scroll.documentView {
+                scroll.contentView.scroll(to:CGPoint(x:0,y:doc.bounds.height-scroll.contentView.bounds.height))
+                scroll.reflectScrolledClipView(scroll.contentView)
+                checks["lastSpeciesReachable"] = doc.visibleRect.maxY >= w.locks.last!.frame.maxY
+                w.tabs.selectTabViewItem(at:0)
+                try snapshot(w.window!,to:folder.appendingPathComponent("settings-last.png"))
+            }
             w.resetDefaults()
             checks["resetRestoresDefaultsAndUnlocks"] = w.draft.probabilities == BirdSettings().probabilities
-            w.cancel();NSStatusBar.system.removeStatusItem(d.status)
+            w.scrollToSpecies(.nightHeron)
+            if let scroll=w.tabs.tabViewItems[0].view as? NSScrollView {
+                checks["manualMigrationScrollsToFirstNewBird"] = scroll.documentView!.visibleRect.intersects(w.fields[7].frame)
+            }
+            w.cancel()
+            d.showSpeciesGallery()
+            checks["galleryMenuAndWindow"] = d.status.menu!.items.contains{$0.title=="鸟种测试…"} && d.gallery?.window?.isVisible == true
+            if let gallery=d.gallery?.window {
+                try snapshot(gallery,to:folder.appendingPathComponent("gallery.png"))
+                let scroll=gallery.contentView!.subviews.first as! NSScrollView
+                let grid=scroll.documentView as! BirdGalleryView
+                checks["galleryIncludesAllRows"] = grid.frame.height == CGFloat((SpeciesID.allCases.count+grid.columns-1)/grid.columns)*grid.cellHeight
+                checks["galleryFitsActualBirdSizes"] = grid.cellWidth >= 48*grid.maxScale && grid.cellHeight > 48*grid.maxScale
+                gallery.close()
+            }
+            NSStatusBar.system.removeStatusItem(d.status)
             let passed=checks.values.allSatisfy{$0}
             saveJSON(["passed":passed,"checks":checks],to:folder.appendingPathComponent("report.json"))
             print("Settings UI: \(passed ? "PASS":"FAIL") — \(checks.count) checks")
@@ -87,11 +113,11 @@ enum SettingsVerification {
             for child in v.subviews { invalidate(child) }
         }
         invalidate(view)
-        let bitmap=NSBitmapImageRep(bitmapDataPlanes:nil,pixelsWide:840,pixelsHigh:690,bitsPerSample:8,samplesPerPixel:4,hasAlpha:true,isPlanar:false,colorSpaceName:.deviceRGB,bytesPerRow:0,bitsPerPixel:0)!
+        let bitmap=NSBitmapImageRep(bitmapDataPlanes:nil,pixelsWide:Int(view.bounds.width),pixelsHigh:Int(view.bounds.height),bitsPerSample:8,samplesPerPixel:4,hasAlpha:true,isPlanar:false,colorSpaceName:.deviceRGB,bytesPerRow:0,bitsPerPixel:0)!
         let graphics=NSGraphicsContext(bitmapImageRep:bitmap)!
         view.displayIfNeeded()
         let ctx=graphics.cgContext
-        ctx.translateBy(x:0,y:view.bounds.height);ctx.scaleBy(x:1,y:-1)
+        if view.isFlipped {ctx.translateBy(x:0,y:view.bounds.height);ctx.scaleBy(x:1,y:-1)}
         view.layer?.render(in:ctx)
         guard let png=bitmap.representation(using:.png,properties:[:]) else { throw NSError(domain:"Snapshot",code:2) }
         try png.write(to:url)

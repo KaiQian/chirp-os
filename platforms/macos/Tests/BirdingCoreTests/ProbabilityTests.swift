@@ -22,7 +22,7 @@ final class ProbabilityTests: XCTestCase {
         XCTAssertEqual(d.entries[2].points,0)
         XCTAssertTrue(d.isValid)
         d.adjust(at:0,to:maximum-1001)
-        let peers=[2,4,5,6].map{d.entries[$0].points}
+        let peers=d.entries.indices.filter{![0,1,3].contains($0)}.map{d.entries[$0].points}
         XCTAssertEqual(peers.reduce(0,+),1001)
         XCTAssertLessThanOrEqual(peers.max()!-peers.min()!,1)
     }
@@ -40,7 +40,7 @@ final class ProbabilityTests: XCTestCase {
         let before=d.entries
         d.adjust(at:0,to:4000)
         let sum=Double(before.dropFirst().reduce(0){$0+$1.points})
-        for i in 1..<7 { XCTAssertEqual(Double(d.entries[i].points),6000*Double(before[i].points)/sum,accuracy:1) }
+        for i in 1..<d.entries.count { XCTAssertEqual(Double(d.entries[i].points),6000*Double(before[i].points)/sum,accuracy:1) }
         XCTAssertTrue(d.isValid)
     }
     func testLongRandomEditSequenceRetainsExactTotalAndLocks() {
@@ -48,7 +48,7 @@ final class ProbabilityTests: XCTestCase {
         var seed:UInt64=53
         for _ in 0..<10_000 {
             seed=seed &* 6364136223846793005 &+ 1
-            let i=Int(seed%7)
+            let i=Int(seed%UInt64(d.entries.count))
             if seed%5==0 { d.setLocked(!d.entries[i].locked,at:i) }
             let locked=d.entries.filter(\.locked)
             d.adjust(at:i,to:Int((seed>>8)%12000)-1000)
