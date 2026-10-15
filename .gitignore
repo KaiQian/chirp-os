@@ -5,3 +5,9 @@ dist/
 **/bin/
 **/obj/
 .vs/
+
+# Machine-specific release configuration and private signing material
+.local/
+*.p12
+*.p8
+*.keychain-db

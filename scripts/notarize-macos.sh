@@ -3,7 +3,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 APP="$ROOT/dist/ChirpOS.app"
-PROFILE="${CHIRPOS_NOTARY_PROFILE:-chirpos-notary}"
+source "$ROOT/scripts/lib/macos-release-config.sh"
+load_macos_release_config
+: "${CHIRPOS_NOTARY_PROFILE:?Missing notarization profile; configure .local/macos-release.env}"
+PROFILE="$CHIRPOS_NOTARY_PROFILE"
 # Refuse ad-hoc or development signing before submitting a release.
 SIGNATURE=$(codesign -dvv "$APP" 2>&1)
 printf '%s\n' "$SIGNATURE" | grep '^Authority=Developer ID Application:' > /dev/null

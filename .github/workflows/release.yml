@@ -17,6 +17,7 @@ jobs:
       contents: write
     env:
       RELEASE_TAG: ${{ inputs.tag }}
+      CHIRPOS_NOTARY_PROFILE: ${{ secrets.MACOS_NOTARY_PROFILE }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -38,7 +39,7 @@ jobs:
           API_ISSUER: ${{ secrets.APPLE_API_ISSUER_ID }}
         run: |
           set -euo pipefail
-          test -n "$CERTIFICATE" && test -n "$API_KEY" && test -n "$API_KEY_ID" && test -n "$API_ISSUER"
+          test -n "$CERTIFICATE" && test -n "$API_KEY" && test -n "$API_KEY_ID" && test -n "$API_ISSUER" && test -n "$CHIRPOS_NOTARY_PROFILE"
           KEYCHAIN="$RUNNER_TEMP/chirpos-signing.keychain-db"
           KEYCHAIN_PASSWORD=$(openssl rand -hex 32)
           echo "::add-mask::$KEYCHAIN_PASSWORD"
@@ -51,16 +52,15 @@ jobs:
           security import "$RUNNER_TEMP/signing.p12" -P "$CERTIFICATE_PASSWORD" -k "$KEYCHAIN" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
           security list-keychains -d user -s "$KEYCHAIN" login.keychain-db
-          xcrun notarytool store-credentials chirpos-notary --key "$RUNNER_TEMP/AuthKey.p8" --key-id "$API_KEY_ID" --issuer "$API_ISSUER"
+          xcrun notarytool store-credentials "$CHIRPOS_NOTARY_PROFILE" --key "$RUNNER_TEMP/AuthKey.p8" --key-id "$API_KEY_ID" --issuer "$API_ISSUER"
       - name: Test and build all platforms
         env:
-          CHIRPOS_SIGNING_IDENTITY: ${{ vars.MACOS_SIGNING_IDENTITY }}
+          CHIRPOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
         run: |
           test -n "$CHIRPOS_SIGNING_IDENTITY"
           bash scripts/test.sh
-          bash scripts/build.sh
+          bash scripts/release-macos.sh
           bash scripts/build-windows.sh win-arm64 win-x64
-          bash scripts/notarize-macos.sh
       - name: Publish one combined release
         env:
           GH_TOKEN: ${{ github.token }}

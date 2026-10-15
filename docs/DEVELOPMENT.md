@@ -80,19 +80,27 @@ Artwork is defined in `platforms/macos/Sources/Birding/PixelArt.swift` and `Spec
 设置与构建缓存分开存储，清理缓存不会重置偏好。
 Settings are separate from build caches; removing caches does not reset preferences.
 
-## Signed macOS releases
+## macOS 发布 / macOS releases
 
-Set `CHIRPOS_SIGNING_IDENTITY` to the full Developer ID Application identity, then run
-`bash scripts/build.sh` and `bash scripts/notarize-macos.sh`. The latter uses the
-`chirpos-notary` keychain profile (override with `CHIRPOS_NOTARY_PROFILE`), requires
-an Accepted notarization result, staples and validates the app, then creates the release ZIP.
-Local builds without a signing identity remain ad-hoc signed.
+正式发布统一使用以下入口，默认完成 Developer ID 签名（含时间戳和 Hardened Runtime）、Apple 公证、票据附加及 Gatekeeper 验证，全部成功后才生成发布 ZIP：
+Use the release entry point for Developer ID signing, timestamping, Hardened Runtime, notarization, stapling, and Gatekeeper validation. A release ZIP is produced only after all steps succeed.
 
-GitHub Actions requires repository variable `MACOS_SIGNING_IDENTITY` and secrets:
-`MACOS_CERTIFICATE_P12_BASE64` (certificate plus private key),
-`MACOS_CERTIFICATE_PASSWORD`, `APPLE_API_KEY_P8`, `APPLE_API_KEY_ID`,
-and `APPLE_API_ISSUER_ID`. Missing credentials stop the release.
-Never commit signing material. Configure these before using the release workflow.
+```bash
+mkdir -p .local
+cp scripts/macos-release.env.example .local/macos-release.env
+chmod 600 .local/macos-release.env
+# Fill in your own signing identity and Keychain profile name in the local file.
+./scripts/release-macos.sh --check
+./scripts/release-macos.sh
+```
+
+本地文件被 Git 忽略，仅存放签名身份和公证配置的名称；证书私钥、密码和 API 凭据保留在钥匙串中。每台机器单独配置。可用 `CHIRPOS_RELEASE_CONFIG` 指定其他本地文件；非空环境变量优先于文件配置。
+The ignored local file stores names only. Private keys and credentials remain in Keychain. Configure each machine separately. `CHIRPOS_RELEASE_CONFIG` selects another local file; nonempty environment variables override file values.
+
+配置缺失或预检查失败时，交互式终端会询问是否使用临时签名（默认否）。无交互环境直接失败，不会自动降级。临时测试包可显式使用 `--ad-hoc`，写入 `dist/adhoc/`，文件名带 `-adhoc`，不经过公证。正式签名或公证执行失败会直接停止。`scripts/build.sh` 是本地开发构建，不代替发布入口。
+Missing or unusable credentials prompt for an ad-hoc fallback in an interactive terminal (default: no). Noninteractive runs fail closed. Explicit `--ad-hoc` creates an unnotarized test ZIP under `dist/adhoc/`, with an `-adhoc` suffix. Signing/notarization failures stop the release. `scripts/build.sh` is a development build, not the release entry point.
+
+GitHub Actions uses repository secrets: `MACOS_SIGNING_IDENTITY`, `MACOS_NOTARY_PROFILE`, `MACOS_CERTIFICATE_P12_BASE64`, `MACOS_CERTIFICATE_PASSWORD`, `APPLE_API_KEY_P8`, `APPLE_API_KEY_ID`, and `APPLE_API_ISSUER_ID`. Missing credentials stop the workflow. Local Keychain settings are not automatically available to CI.
 
 Windows release assets are always ZIP archives containing ChirpOS.exe, LICENSE.txt,
 README.md, and Verify-Windows.cmd. Both shell and PowerShell builds read the version
