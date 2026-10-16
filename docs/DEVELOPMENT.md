@@ -31,6 +31,10 @@ Requires macOS 13+ and Swift Command Line Tools. Builds target the host architec
 ./scripts/verify-population.sh
 ./scripts/verify-settings.sh
 .build/release/Birding --verify-birds .build/bird-check
+.build/release/Birding --verify-perching .build/perching-check
+.build/release/Birding --verify-interior .build/interior-check
+.build/release/Birding --verify-iterm-live .build/iterm-live-check
+.build/release/Birding --verify-app-headers .build/app-headers-check
 ```
 
 ## Windows

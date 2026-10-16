@@ -3,6 +3,17 @@ import CoreGraphics
 @testable import BirdingCore
 
 final class PopulationTests: XCTestCase {
+    func testNormalVisitsAreSpacedApartWhileStartupStillFillsPromptly() {
+        let p=Population()
+        XCTAssertEqual(p.tick(0.8,residents:3,total:3,random:{0.5}),.arrive)
+        XCTAssertNil(p.tick(29,residents:4,total:4,random:{0.5}))
+        XCTAssertNil(p.tick(15.9,residents:4,total:4,random:{0.5}))
+        XCTAssertEqual(p.tick(0.2,residents:4,total:4,random:{0.5}),.depart)
+        let startup=Population()
+        XCTAssertEqual(startup.tick(0.8,residents:0,total:0,random:{0.5}),.arrive)
+        XCTAssertNil(startup.tick(4,residents:1,total:1,random:{0.5}))
+        XCTAssertEqual(startup.tick(0.3,residents:1,total:1,random:{0.5}),.arrive)
+    }
     func testEmptyStartupThenExactlyOneArrival() {
         let p = Population()
         XCTAssertNil(p.tick(0.4,residents:0,total:0,random:{0.5}))

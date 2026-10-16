@@ -61,7 +61,103 @@ Check(Geometry.LandingRanges(edge,new[]{edge},desktop,1,new[]{new Box(0,200,1000
 var clipped=new Surface(102,new(-1000,300,1500,400));var clippedRanges=Geometry.LandingRanges(clipped,new[]{clipped},desktop,1,[]);
 Check(clippedRanges.Count==1 && clippedRanges[0].Lo==29 && clippedRanges[0].Hi==458,"offscreen host retains exposed landing edge");
 
+foreach(var scale in new[]{1d,2.5})foreach(var gap in new[]{3d,30}) {
+    var stripFront=new Surface(103,new(0,300+gap,1000,400));var stripScene=new[]{stripFront,edge};
+    var stripRanges=Geometry.LandingRanges(edge,stripScene,desktop,scale,[]);
+    Check(stripRanges.Any(r=>r.Lo<=500 && r.Hi>=500) && Geometry.Visible(edge.Id,new(500,300),stripScene,scale),"exposed background strip accepts body and feet at both scales");
+    var stripBird=new Bird(s,new(500,500),rng);stripBird.Fly(new(500,300),edge,2);stripBird.UpdateHost(stripScene,.03,scale);stripBird.Tick(1);stripBird.Tick(.43);
+    Check(stripBird.State==BirdState.Perched && stripBird.Depth==edge.Id && stripBird.Blockers(stripScene).SequenceEqual(new[]{stripFront.Rect}),"background landing retains foreground tail masking");
+}
+var footCover=new Surface(104,new(0,300,1000,400));
+Check(Geometry.LandingRanges(edge,new[]{footCover,edge},desktop,1,[]).Count==0 && !Geometry.Visible(edge.Id,new(500,300),new[]{footCover,edge},1),"covered feet cannot become a background perch");
+Check(Geometry.LandingRanges(edge,new[]{edge},desktop,1,new[]{new Box(0,303,1000,20)}).Count==0,"tail allowance does not relax bird spacing");
+var tailWindow=new Surface(105,new(470,303,20,20));
+Check(Geometry.Visible(edge.Id,new(500,300),new[]{tailWindow,edge},1) && !Geometry.Visible(edge.Id,new(500,300),new[]{tailWindow,edge},1,PerchEdge.Left),"only top perches allow foreground tail masking");
+var searching=new Bird(s,new(0,0),rng);
+for(var i=0;i<12;i++){searching.Fly(new(300,300),null,2);searching.Tick(1);}
+Check(searching.SearchExpired && searching.SearchAge==12,"reroutes cannot restart the 12 second search limit");
+searching.Fly(new(500,300),edge,1);searching.Tick(.5);
+Check(searching.State==BirdState.Landing && !searching.SearchExpired && searching.SearchAge==0,"successful landing resets search budget");
+searching.Fly(new(500,300),edge,4);searching.Tick(1);searching.UpdateHost(new[]{footCover,edge},.03,1);var blockedPosition=searching.Position;searching.Tick(11);
+Check(searching.SearchExpired && searching.Position==blockedPosition,"blocked destination still consumes search budget without teleporting");
+searching.Fly(new(-500,300),null,2,30,true);searching.Tick(1);
+Check(!searching.SearchExpired && searching.DepartureFinished && !searching.NeedsDestination,"timed out bird can finish leaving without rerouting");
+searching.Perch(edge);searching.Flee();searching.Tick(0);
+Check(searching.SearchAge==0 && !searching.SearchExpired,"perching resets budget and zero elapsed time does not advance it");
+
 var hover=new HoverTracker<object>();var one=new object();var two=new object();
+var fullScreen=new Box(-1920,-1080,1920,1080);var fullWindow=new Surface(300,fullScreen);var workArea=new Box(-1850,-1047,1850,977);
+foreach(var scale in new[]{.75,1,3.75}) {
+    var bottom=Geometry.BottomRanges(fullWindow,new[]{fullWindow},workArea,scale,[]);
+    Check(Geometry.LandingRanges(fullWindow,new[]{fullWindow},workArea,scale,[]).Count==0 && bottom.Count>0,"fullscreen without headroom has bottom perches");
+    var option=new PerchChoice(fullWindow,PerchEdge.Bottom,workArea,scale,bottom[0].Lo,bottom[0].Hi);var point=option.Foot((option.Lo+option.Hi)/2);
+    var contactBird=new Bird(s,new(0,0),rng){Edge=PerchEdge.Bottom,BottomViewport=workArea,Fraction=option.Fraction(point.X)};contactBird.Perch(fullWindow,scale);
+    var tailMask=contactBird.Blockers(new[]{fullWindow}).Single();
+    Check(Math.Abs(point.Y-workArea.Bottom)<.001 && tailMask.Y==point.Y && Geometry.Landing(point,scale).Y>=workArea.Y,"bottom feet meet edge and tail mask starts at contact line at every scale");
+}
+var rearFull=new Surface(301,fullScreen);var popup=new Surface(302,new(-1200,-200,300,200));
+Check(Geometry.BottomRanges(rearFull,new[]{fullWindow,rearFull},fullScreen,1,[]).Count==0,"covered fullscreen window cannot create hidden bottom perches");
+var bottomFree=Geometry.BottomRanges(fullWindow,new[]{popup,fullWindow},fullScreen,1,new[]{new Box(-600,-60,100,60)});
+Check(bottomFree.Count>=2 && bottomFree.All(q=>!Geometry.Landing(new((q.Lo+q.Hi)/2,0),1).Intersects(popup.Rect)),"bottom candidates respect popups and bird reservations");
+var bottomBird=new Bird(s,new(0,0),rng){Edge=PerchEdge.Bottom,BottomViewport=fullScreen};bottomBird.Fly(Geometry.Foot(fullWindow,.5,PerchEdge.Bottom,1,fullScreen),fullWindow,1);bottomBird.Tick(.5);
+Check(bottomBird.Frame=="land0","bottom perch uses standing landing rather than clinging");bottomBird.Tick(.43);
+bottomBird.BottomViewport=new Box(-1920,-1080,1920,1010);var bottomBefore=bottomBird.Position;bottomBird.UpdateHost(new[]{fullWindow},.033,1);
+Check(bottomBird.State==BirdState.Perched && Math.Abs(bottomBird.Position.Y-(bottomBefore.Y-70))<.001 && bottomBird.Startles==0,"taskbar changes adjust bottom perch without a startle");
+var normalWindow=fullWindow with{Rect=new(-1820,-980,1720,880)};var beforeRestore=bottomBird.Position;bottomBird.UpdateHost(new[]{normalWindow},.033,1);
+Check(bottomBird.NeedsDestination && bottomBird.Position==beforeRestore && bottomBird.Host==null && bottomBird.Startles==0,"restoring window invalidates bottom perch without teleporting");
+var focusedFull=fullWindow with{IsFocused=true};var focusBird=new Bird(s,new(0,0),rng){Edge=PerchEdge.Bottom,BottomViewport=fullScreen};focusBird.Perch(fullWindow);var focusPosition=focusBird.Position;focusBird.UpdateHost(new[]{focusedFull},.033,1);
+Check(focusBird.State==BirdState.Flying && focusBird.Host==null && focusBird.Position==focusPosition && focusBird.Startles==1,"focus startles a bottom bird without teleporting");
+Check(Geometry.BottomRanges(focusedFull,new[]{focusedFull},fullScreen,1,[]).Count==0 && Geometry.BottomRanges(rearFull,new[]{focusedFull,rearFull},fullScreen,1,[]).Count==0,"focused fullscreen does not admit bottom birds or hidden background replacements");
+Check(Geometry.LandingRanges(normalWindow with{IsFocused=true},new[]{normalWindow with{IsFocused=true}},fullScreen,1,[]).Count>0,"focused ordinary windows retain top perches");
+
+var capBirds=new[]{new Bird(s,new(0,0),rng),new Bird(s,new(0,0),rng)};
+Check(FlockCoordinator.CanAdmit(s.Id,new[]{capBirds[0]}) && !FlockCoordinator.CanAdmit(s.Id,capBirds),"each species admits at most two sprites");
+capBirds[1].Flee();capBirds[1].Fly(new(1000,0),null,2,0,true);
+Check(!FlockCoordinator.CanAdmit(s.Id,capBirds),"departing sprites count toward species limit until removed");
+var cappedProbability=new Probabilities{Points=[10000,0,0],Locked=[false,false,false]};
+Check(cappedProbability.ChooseEligible(rng,i=>i!=0)==null && cappedProbability.Points[0]==10000,"capped sole enabled species pauses arrivals without enabling disabled species or changing weights");
+var social=new FlockCoordinator();var leader=new Bird(s,new(0,0),rng);leader.Perch(edge);social.DidArrive(leader,new[]{leader},5,0);social.Tick(3,new[]{leader},()=>.5);
+Check(social.CompanionReady && social.ArrivalSpecies("treeSparrow",new[]{leader})==s.Id && !social.CompanionReady,"same species companion waits before entering");
+var mate=new Bird(s,new(0,0),rng);social.PrepareArrival(mate,new[]{leader});social.DidArrive(mate,new[]{leader,mate},5,0);
+Check(mate.GroupId==leader.GroupId && social.ArrivalSpecies("treeSparrow",new[]{leader,mate})=="treeSparrow","pair shares group and does not chain into more arrivals");
+var capacitySocial=new FlockCoordinator();var solo=new Bird(s,new(0,0),rng);capacitySocial.DidArrive(solo,new[]{solo},1,0);
+Check(solo.GroupId==null && capacitySocial.ArrivalSpecies("treeSparrow",new[]{solo})=="treeSparrow","companion request respects population upper bound");
+var expiredSocial=new FlockCoordinator();expiredSocial.DidArrive(solo,new[]{solo},5,0);expiredSocial.Tick(26,new[]{solo},()=>.5);
+Check(expiredSocial.ArrivalSpecies("treeSparrow",new[]{solo})=="treeSparrow","unfilled pair request expires");
+var pairReserved=Geometry.Landing(leader.Position,1);pairReserved=new(pairReserved.X-8,pairReserved.Y-8,pairReserved.W+16,pairReserved.H+16);
+var pairOptions=Geometry.LandingRanges(edge,new[]{edge},desktop,1,new[]{pairReserved}).Select(q=>new PerchChoice(edge,PerchEdge.Top,desktop,1,q.Lo,q.Hi)).ToArray();
+var together=social.Choose(pairOptions,mate,new[]{leader},()=>.9)!.Value;var togetherFoot=together.Choice.Foot(together.Coordinate);
+Check(Math.Abs(togetherFoot.X-leader.Position.X)<120 && !Geometry.Landing(togetherFoot,1).Intersects(pairReserved),"companions choose nearby safe space without overlap");
+var socialBirds=Enumerable.Range(0,4).Select(_=>{var q=new Bird(s,new(0,0),rng);q.Perch(edge);return q;}).ToArray();socialBirds[3]=new Bird(s with{Id="nightHeron"},new(0,0),rng);socialBirds[3].Perch(edge);var groupClock=new FlockCoordinator(1);groupClock.Tick(1,socialBirds,()=>0);
+Check(groupClock.Phase==FlockPhase.Gathering && socialBirds.Count(q=>q.GroupId==socialBirds[0].GroupId)==2 && socialBirds[1].SocialMoveDelay==1 && socialBirds[2].SocialMoveDelay==null,"small gathering keeps leader and staggers followers");
+socialBirds[1].Tick(1);socialBirds[2].Tick(1);Check(socialBirds[1].NeedsDestination && !socialBirds[2].NeedsDestination,"group followers take off at different times");
+groupClock.Tick(30,socialBirds,()=>0);Check(groupClock.Phase==FlockPhase.Dispersing && socialBirds.All(q=>q.GroupId==null) && socialBirds.Where(q=>q.SocialMoveDelay!=null).Select(q=>q.SocialMoveDelay).SequenceEqual(new double?[]{.5,2.5}),"dispersal clears groups and stages departures");
+var conspecific=new FlockCoordinator(0);var samePair=new[]{new Bird(s with{Id="nightHeron"},new(0,0),rng),new Bird(s with{Id="treeSparrow"},new(0,0),rng),new Bird(s,new(0,0),rng),new Bird(s,new(0,0),rng)};
+conspecific.Tick(0,samePair,()=>0);
+Check(samePair[0].GroupId==null && samePair[1].GroupId==null && samePair[2].GroupId!=null && samePair[2].GroupId==samePair[3].GroupId,"same species pair takes precedence and is not padded with other species");
+conspecific.Tick(30,samePair,()=>0);
+Check(samePair[0].SocialMoveDelay==null && samePair[1].SocialMoveDelay==null,"unrelated species are not moved by group dispersal");
+var mixedCycles=0;
+for(var ticket=0;ticket<100;ticket++) {
+    var rare=new FlockCoordinator(0);var unique=new[]{new Bird(s,new(0,0),rng),new Bird(s with{Id="treeSparrow"},new(0,0),rng),new Bird(s with{Id="nightHeron"},new(0,0),rng)};
+    var draw=ticket/100d;rare.Tick(0,unique,()=>draw);
+    if(rare.Phase==FlockPhase.Gathering)mixedCycles++;
+    else if(unique.Any(b=>b.GroupId!=null || b.SocialMoveDelay!=null))throw new Exception("skipped mixed gathering moved birds");
+}
+Check(mixedCycles==5,"without same species companions only five percent of cycles mix species");
+var separateHost=new Surface(303,new(0,500,1000,400));var separateOptions=new[]{new PerchChoice(edge,PerchEdge.Top,desktop,1,100,500),new PerchChoice(separateHost,PerchEdge.Top,desktop,1,100,500)};
+Check(groupClock.Choose(separateOptions,socialBirds[0],socialBirds,()=>0)!.Value.Choice.Host.Id==303,"dispersal chooses a different less occupied window");
+var delayed=new Bird(s,new(0,0),rng);delayed.Fly(new(500,300),edge,4);delayed.ScheduleSocialMove(2);delayed.Tick(1);Check(delayed.SocialMoveDelay==2,"social move delay waits until landing");
+var youngPair=new[]{new Bird(s,new(0,0),rng),new Bird(s,new(0,0),rng)};var pairId=Guid.NewGuid();
+foreach(var q in youngPair){q.GroupId=pairId;q.Perch(edge);q.Tick(20);}
+var oldSingle=new Bird(s,new(0,0),rng);oldSingle.Perch(edge);oldSingle.Tick(20);
+Check(social.DepartureCandidate(youngPair.Append(oldSingle).ToArray(),false,0)==oldSingle,"natural departures prefer established solo birds");
+Check(social.DepartureCandidate(youngPair,false,0)==null && social.DepartureCandidate(youngPair,true,0)==youngPair[0],"fresh pair stays together unless reducing population range");
+var leadership=new FlockCoordinator(0);var leaderBirds=Enumerable.Range(0,4).Select(_=>{var q=new Bird(s,new(0,0),rng);q.Perch(edge);return q;}).ToArray();leaderBirds[3].Perch(separateHost);
+var leadershipDraws=new Queue<double>(new[]{0,.75,0,0,0});leadership.Tick(0,leaderBirds,()=>leadershipDraws.Dequeue());
+Check(leaderBirds[3].LeadsGroup && leadership.Choose(separateOptions,leaderBirds[0],leaderBirds,()=>.5)!.Value.Choice.Host.Id==separateHost.Id,"followers gather near leader rather than another waiting follower");
+var boundedSocial=new FlockCoordinator(0);var boundedBirds=Enumerable.Range(0,4).Select(_=>{var q=new Bird(s,new(0,0),rng);q.Perch(edge);return q;}).ToArray();boundedBirds[0].GroupId=Guid.NewGuid();boundedBirds[3].GroupId=boundedBirds[0].GroupId;boundedSocial.Tick(0,boundedBirds,()=>0);
+Check(boundedBirds.Count(b=>b.GroupId==boundedBirds[0].GroupId)==2 && boundedBirds[3].SocialMoveDelay!=null,"existing pair joins gathering without adding a third bird");
 Check(hover.Update(one,10)==null && hover.Update(one,10.99)==null && hover.Update(one,11)==one,"hover waits 1 second");
 Check(hover.Update(two,13.1)==null && hover.Update(null,14)==null && hover.Update(two,17)==null && hover.Update(two,20)==two,"hover resets on identity change and exit");
 Check(SpeciesBehavior.Frame("nightHeron",12)=="stand" && SpeciesBehavior.Frame("nightHeron",21)=="stretch" && SpeciesBehavior.Frame("nightHeron",31.4)!.StartsWith("poop") && SpeciesBehavior.Frame("nightHeron",33)=="stand","night heron quiet watch and spaced actions");
@@ -82,6 +178,19 @@ oldPrefs.AllocateNewSpecies(migrationSpecies.Reverse().ToArray());
 Check(oldPrefs.Probability.Points[0]==1250 && oldPrefs.Probability.Points[7]==8750 && oldPrefs.Probability.Locked[7],"new species share by count scales locked values but keeps locks");
 var roundtrip=System.Text.Json.JsonSerializer.Deserialize<Preferences>(System.Text.Json.JsonSerializer.Serialize(oldPrefs))!;
 Check(roundtrip.Migrate(migrationSpecies.Reverse().ToArray()) && roundtrip.PendingSpeciesIds!.SequenceEqual(new[]{"nightHeron"}),"unresolved new species remain pending across restarts");
+var calmSpecies=migrationSpecies.Select(x=>x with{PerchMin=42,PerchMax=84}).ToArray();
+var oldTiming=new Preferences{Probability=Probabilities.From(calmSpecies),SpeciesIds=calmSpecies.Select(x=>x.Id).ToArray()};
+oldTiming.Behaviors[oldIds[0]]=Behavior.From(s) with{Speed=1.5};
+oldTiming.Behaviors[oldIds[1]]=Behavior.From(s) with{PerchMin=11};
+oldTiming.Behaviors[oldIds[2]]=Behavior.From(s) with{PerchMax=29};
+oldTiming.Probability.Locked[0]=true;var oldPoints=(int[])oldTiming.Probability.Points.Clone();
+var timingJson=System.Text.Json.JsonSerializer.Serialize(oldTiming).Replace(",\"PerchTimingVersion\":0","");
+var upgradedTiming=System.Text.Json.JsonSerializer.Deserialize<Preferences>(timingJson)!;
+Check(upgradedTiming.Migrate(calmSpecies) && upgradedTiming.PerchTimingVersion==1 && upgradedTiming.Resolve(calmSpecies[0]).PerchMin==42 && upgradedTiming.Resolve(calmSpecies[0]).PerchMax==84 && upgradedTiming.Resolve(calmSpecies[0]).Speed==1.5,"old default perches upgrade while retaining other traits");
+Check(upgradedTiming.Behaviors[oldIds[1]]==oldTiming.Behaviors[oldIds[1]] && upgradedTiming.Behaviors[oldIds[2]]==oldTiming.Behaviors[oldIds[2]] && upgradedTiming.Probability.Locked[0] && upgradedTiming.Probability.Points.SequenceEqual(oldPoints),"perch upgrade preserves custom ranges probabilities and locks");
+upgradedTiming.Behaviors[oldIds[0]]=Behavior.From(s);
+var timingReload=System.Text.Json.JsonSerializer.Deserialize<Preferences>(System.Text.Json.JsonSerializer.Serialize(upgradedTiming))!;
+Check(timingReload.Migrate(calmSpecies) && timingReload.Resolve(calmSpecies[0]).PerchMin==14 && timingReload.Resolve(calmSpecies[0]).PerchMax==28,"later custom choice of former defaults survives reload");
 var galleryFrames=Enumerable.Range(0,1200).Select(i=>GalleryPose.Frame("nightHeron",i/30d,20)).ToHashSet();
 Check(new[]{"fly0","fly7","land2","idle1","preen1","stretch","shake","poop0","poop1"}.All(galleryFrames.Contains),"gallery cycles regular and special actions");
 Console.WriteLine($"{count} core checks passed.");

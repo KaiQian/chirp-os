@@ -20,6 +20,16 @@ public struct SpeciesProfile: Codable, Equatable {
 }
 public struct SpeciesCatalog: Codable {
     public var species: [SpeciesProfile]
+    // Upgrade only the former default pair; keep custom perch ranges and other traits.
+    public mutating func migratePerchDefaults() {
+        for i in species.indices {
+            let current = Self.standard.profile(species[i].id)
+            if species[i].perchMin == current.perchMin / 3 && species[i].perchMax == current.perchMax / 3 {
+                species[i].perchMin = current.perchMin
+                species[i].perchMax = current.perchMax
+            }
+        }
+    }
     public static let standard: SpeciesCatalog = {
         let packaged = Bundle.main.resourceURL?.appendingPathComponent("Birding_BirdingCore.bundle/species.json")
         let url = packaged.flatMap { FileManager.default.fileExists(atPath:$0.path) ? $0 : nil }

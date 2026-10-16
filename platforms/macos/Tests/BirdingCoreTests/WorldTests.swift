@@ -4,6 +4,50 @@ import CoreGraphics
 
 final class WorldTests: XCTestCase {
     let host = Surface(id:42,rect:CGRect(x:100,y:300,width:500,height:250))
+    func testSearchBudgetSurvivesReroutesAndResetsAfterLanding() {
+        let b=Bird(position:.zero,fraction:0.5)
+        for _ in 0..<11 {
+            b.fly(to:CGPoint(x:300,y:300),host:nil,duration:2)
+            b.tick(1)
+            XCTAssertFalse(b.searchExpired)
+        }
+        b.fly(to:CGPoint(x:300,y:300),host:nil,duration:2)
+        b.tick(1)
+        XCTAssertTrue(b.searchExpired)
+        b.fly(to:CGPoint(x:350,y:300),host:host,duration:1)
+        b.tick(0.5)
+        XCTAssertEqual(b.state,.landing)
+        XCTAssertEqual(b.searchTime,0)
+        XCTAssertFalse(b.searchExpired)
+        b.tick(0.43); b.tick(100)
+        XCTAssertEqual(b.searchTime,0)
+    }
+    func testBlockedDestinationCannotFreezeSearchBudget() {
+        let b=Bird(position:.zero,fraction:0.5)
+        b.fly(to:CGPoint(x:350,y:300),host:host,duration:4)
+        b.tick(1)
+        let cover=Surface(id:1,rect:CGRect(x:100,y:200,width:500,height:500))
+        b.updateHost(surfaces:[cover,host],sampleDT:0.03)
+        let position=b.position
+        b.tick(11)
+        XCTAssertEqual(b.position,position)
+        XCTAssertTrue(b.searchExpired)
+        b.depart(to:CGPoint(x:-500,y:300),duration:2)
+        b.tick(1)
+        XCTAssertFalse(b.searchExpired)
+        XCTAssertTrue(b.departureFinished)
+        XCTAssertFalse(b.needsDestination)
+    }
+    func testPerchingRestartsBudgetAndZeroTimeDoesNotUseIt() {
+        let b=Bird(position:.zero,fraction:0.5)
+        b.tick(12)
+        XCTAssertTrue(b.searchExpired)
+        b.perch(on:host)
+        b.flee()
+        for _ in 0..<100 { b.tick(0) }
+        XCTAssertEqual(b.searchTime,0)
+        XCTAssertFalse(b.searchExpired)
+    }
     func testSlowMovementKeepsRelativePerch() {
         let b = Bird(position:.zero,fraction:0.4); b.perch(on:host)
         let old = b.position
@@ -100,14 +144,15 @@ final class WorldTests: XCTestCase {
         XCTAssertEqual(bird.position.y,end.y,accuracy:0.001)
         XCTAssertEqual(bird.blockers(in:windows),[a.rect,b.rect])
     }
-    func testPartlyCoveredLandingIsRejectedEvenWithMostlyVisibleHead() {
+    func testCoveredBodyIsRejectedButHangingTailMayBeMasked() {
         let end = CGPoint(x:350,y:300)
         let cover = Surface(id:1,rect:CGRect(x:365,y:250,width:20,height:80))
         XCTAssertFalse(Geometry.isLandingVisible(on:host.id,at:end,surfaces:[cover,host],scale:1))
         XCTAssertTrue(Geometry.isLandingVisible(on:host.id,at:end,surfaces:[host,cover],scale:1))
-        // Tail extends below the top edge; testing only the head would miss this.
+        // A foreground window may cover only the hanging tail on a background perch.
         let tailCover = Surface(id:2,rect:CGRect(x:320,y:303,width:20,height:20))
-        XCTAssertFalse(Geometry.isLandingVisible(on:host.id,at:end,surfaces:[tailCover,host],scale:1))
+        XCTAssertTrue(Geometry.isLandingVisible(on:host.id,at:end,surfaces:[tailCover,host],scale:1))
+        XCTAssertFalse(Geometry.isLandingVisible(on:host.id,at:end,surfaces:[tailCover,host],scale:1,edge:.left))
     }
     func testLandingVisibilityAccountsForDisplayScale() {
         let end = CGPoint(x:350,y:300)

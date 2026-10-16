@@ -39,10 +39,22 @@ final class FixtureController {
             case "slow": slowRemaining = 30
             case "cover":
                 cover.setFrameOrigin(CGPoint(x:host.frame.midX+4,y:host.frame.maxY-100)); cover.orderFrontRegardless()
-            case "uncover": cover.orderOut(nil)
-            case "fast": host.setFrameOrigin(CGPoint(x:host.frame.minX+150,y:host.frame.minY))
+            case "uncover": cover.orderOut(nil); host.orderFrontRegardless()
+            case "strip":
+                cover.setFrame(CGRect(x:host.frame.minX,y:host.frame.maxY-3-cover.frame.height,width:host.frame.width,height:cover.frame.height),display:true)
+                host.orderFrontRegardless()
+                cover.orderFrontRegardless()
+            case "fast": host.setFrameOrigin(CGPoint(x:host.frame.minX+150,y:host.frame.minY)); host.orderFrontRegardless()
             case "hide": host.orderOut(nil)
             case "show": host.orderFrontRegardless()
+            case "native-fullscreen":
+                cover.orderOut(nil)
+                host.collectionBehavior.insert(.fullScreenPrimary)
+                NSApp.activate(ignoringOtherApps:true);host.makeKeyAndOrderFront(nil)
+                host.toggleFullScreen(nil)
+            case "native-windowed":
+                if host.styleMask.contains(.fullScreen) {host.toggleFullScreen(nil)}
+            case "focus-host": NSApp.activate(ignoringOtherApps:true);host.makeKeyAndOrderFront(nil)
             case "quit": NSApp.terminate(nil)
             default: break
             }
@@ -59,6 +71,7 @@ final class IntegrationCheck {
     var fixturePID: Int32 = 0
     var initial = CGPoint.zero
     var initialFrontPID: Int32 = 0
+    var focusWindow:NSWindow?
     var bird: Bird { desktop.birds[0] }
     init(desktop: DesktopController, folder:URL) { self.desktop = desktop; self.folder = folder }
     func after(_ seconds: Double,_ action: @escaping () -> Void) { DispatchQueue.main.asyncAfter(deadline:.now()+seconds,execute:action) }
@@ -98,6 +111,7 @@ final class IntegrationCheck {
             self.command("uncover")
         }
         after(3.8) {
+            self.recordScene("uncovered")
             self.results["zOrderRefreshesWhenCoverHidden"] = !self.bird.blockers(in:self.desktop.surfaces).contains{$0.intersects(self.desktop.bounds(of:self.bird))}
             self.command("fast")
         }
@@ -114,8 +128,74 @@ final class IntegrationCheck {
         }
         after(6.4) {
             self.results["hiddenHostReleasesBird"] = self.bird.state == .flying && self.bird.hostID == nil && self.bird.startledCount == 2
+            self.command("show")
+        }
+        after(6.8) { self.command("strip") }
+        after(7.2) {
+            self.recordScene("background-strip")
+            guard let host=self.host() else { self.finish(error:"background fixture missing");return }
+            let scale=self.desktop.spriteScale(for:self.bird)
+            let foot=Geometry.foot(on:host,fraction:0.5,edge:.top)
+            self.results["backgroundStripOffersLanding"]=self.desktop.screenRects.contains { screen in
+                Geometry.landingRanges(on:host,surfaces:self.desktop.surfaces,screen:screen,scale:scale).contains{$0.contains(foot.x)}
+            }
+            self.bird.fraction=0.5
+            self.bird.fly(to:foot,host:host,duration:0.8,arc:40)
+        }
+        after(8.4) {
+            self.results["landsOnExposedBackgroundStrip"]=self.bird.state == .perched && self.bird.hostID==self.hostID && self.bird.depthID==self.hostID
+            self.results["backgroundStripRetainsForegroundMask"]=self.bird.blockers(in:self.desktop.surfaces).contains { $0.minY > self.bird.position.y && $0.minY < self.bird.position.y+9 }
+            self.saveLayerSnapshot()
+            self.command("native-fullscreen")
+        }
+        after(11.4) {
+            self.recordScene("fullscreen")
+            guard let host=self.host(),let screen=self.desktop.screenRects.first(where:{$0.contains(CGPoint(x:host.rect.midX,y:host.rect.midY))}) else {self.finish(error:"fullscreen fixture missing");return}
+            let scale=self.desktop.spriteScale(for:self.bird)
+            self.results["focusedNativeFullscreenRejectsBottomPerch"] = host.isFocused && Geometry.bottomRanges(on:host,surfaces:self.desktop.surfaces,screen:screen,scale:scale).isEmpty
+            let displays=NSScreen.screens
+            let area=(displays.count>1 ? displays[1]:displays[0]).visibleFrame
+            let helper=NSWindow(contentRect:CGRect(x:area.midX-110,y:area.midY,width:220,height:80),styleMask:[.titled],backing:.buffered,defer:false)
+            helper.title="ChirpOS · Focus fixture";helper.isReleasedWhenClosed=false
+            helper.collectionBehavior=[.canJoinAllSpaces,.fullScreenAuxiliary]
+            self.focusWindow=helper;NSApp.activate(ignoringOtherApps:true);helper.makeKeyAndOrderFront(nil)
+        }
+        after(12.4) {
+            guard let host=self.host(),let screen=self.desktop.screenRects.first(where:{$0.contains(CGPoint(x:host.rect.midX,y:host.rect.midY))}) else {self.finish(error:"unfocused fullscreen fixture missing");return}
+            let scale=self.desktop.spriteScale(for:self.bird)
+            self.results["nativeFullscreenOffersBottomPerch"] = !host.isFocused && !Geometry.bottomRanges(on:host,surfaces:self.desktop.surfaces,screen:screen,scale:scale).isEmpty
+            self.bird.edge = .bottom;self.bird.bottomViewport=screen
+            let foot=Geometry.foot(on:host,fraction:0.5,edge:.bottom,scale:scale,screen:screen)
+            self.bird.fly(to:foot,host:host,duration:0.8,arc:40)
+        }
+        after(13.8) {
+            self.results["nativeFullscreenBirdLandsAtBottom"]=self.bird.state == .perched && self.bird.edge == .bottom && self.bird.hostID==self.hostID
+            let view=self.desktop.views.first{$0.desktopRect.intersects(self.desktop.bounds(of:self.bird))}
+            let info=CGWindowListCopyWindowInfo([.optionOnScreenOnly,.excludeDesktopElements],kCGNullWindowID) as? [[String:Any]] ?? []
+            let visible=Set(info.compactMap{$0[kCGWindowNumber as String] as? Int})
+            self.results["overlaySharesNativeFullscreenSpace"]=view?.window.map{visible.contains($0.windowNumber)} ?? false
+            self.saveLayerSnapshot()
+            self.focusWindow?.orderOut(nil)
+            self.command("focus-host")
+        }
+        after(14.6) {
+            self.results["focusingNativeFullscreenEvictsBottomBird"]=self.host()?.isFocused==true && self.bird.state == .flying && self.bird.hostID != self.hostID
+            self.command("native-windowed")
+        }
+        after(17.6) {
+            self.results["exitFullscreenReleasesBottomPerch"] = !(self.bird.edge == .bottom && self.bird.hostID==self.hostID)
+            if let host=self.host() {
+                self.bird.edge = .top;self.bird.bottomViewport=nil
+                self.bird.fly(to:Geometry.foot(on:host,fraction:0.5,edge:.top),host:host,duration:0.8,arc:40)
+            }
+        }
+        after(19) {
+            self.results["restoredWindowUsesNormalTopPerch"]=self.bird.state == .perched && self.bird.edge == .top && self.bird.hostID==self.hostID
             self.finish(error:nil)
         }
+    }
+    func recordScene(_ name:String) {
+        saveJSON(["hostID":hostID,"bird":NSStringFromPoint(bird.position),"windows":desktop.surfaces.map{["id":$0.id,"pid":$0.pid,"layer":$0.layer,"rect":NSStringFromRect($0.rect)] as [String:Any]}],to:folder.appendingPathComponent("scene-\(name).json"))
     }
     func saveMaskedBird() {
         let bbox = desktop.bounds(of:bird)
@@ -142,7 +222,7 @@ final class IntegrationCheck {
         results["renderedOcclusionHasNoPixelLeaks"] = opaque > 0 && leaked == 0
     }
     func saveLayerSnapshot() {
-        guard let view = desktop.views.first(where:{$0.desktopRect.contains(bird.position)}),let root = view.layer else { return }
+        guard let view = desktop.views.first(where:{$0.desktopRect.intersects(desktop.bounds(of:bird))}),let root = view.layer else { return }
         view.updateSprites()
         let w = Int(view.bounds.width), h = Int(view.bounds.height)
         let ctx = CGContext(data:nil,width:w,height:h,bitsPerComponent:8,bytesPerRow:w*4,space:CGColorSpaceCreateDeviceRGB(),bitmapInfo:CGImageAlphaInfo.premultipliedLast.rawValue)!
@@ -152,7 +232,7 @@ final class IntegrationCheck {
         saveJSON(["view":NSStringFromRect(view.bounds),"root":NSStringFromRect(root.bounds),"layers":(root.sublayers ?? []).map{["frame":NSStringFromRect($0.frame),"mask":NSStringFromRect($0.mask?.bounds ?? .zero),"hidden":$0.isHidden] as [String:Any]}],to:folder.appendingPathComponent("layer-geometry.json"))
         if let full = ctx.makeImage() { try? NSBitmapImageRep(cgImage:full).representation(using:.png,properties:[:])!.write(to:folder.appendingPathComponent("full-layer.png")) }
         let bbox = desktop.bounds(of:bird)
-        let crop = bbox.offsetBy(dx:-view.desktopRect.minX,dy:-view.desktopRect.minY).integral
+        let crop = bbox.offsetBy(dx:-view.desktopRect.minX,dy:-view.desktopRect.minY).integral.intersection(CGRect(x:0,y:0,width:w,height:h))
         guard let image = ctx.makeImage()?.cropping(to:crop) else { return }
         let rep = NSBitmapImageRep(cgImage:image)
         try? rep.representation(using:.png,properties:[:])!.write(to:folder.appendingPathComponent("actual-layer.png"))
@@ -172,6 +252,8 @@ final class IntegrationCheck {
         let passed = error == nil && !results.isEmpty && results.values.allSatisfy{$0}
         saveJSON(["passed":passed,"checks":results,"error":error ?? "","os":ProcessInfo.processInfo.operatingSystemVersionString],to:folder.appendingPathComponent("report.json"))
         command("quit")
+        focusWindow?.orderOut(nil)
+        NSRunningApplication(processIdentifier:initialFrontPID)?.activate(options:[.activateIgnoringOtherApps])
         print("Desktop integration: \(passed ? "PASS" : "FAIL") — \(results.count) checks")
         fflush(stdout)
         exit(passed ? 0 : 1)

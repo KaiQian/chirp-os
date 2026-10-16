@@ -70,6 +70,16 @@ public struct ProbabilityDistribution: Codable, Equatable {
         for i in order.prefix(max(0,total-result.reduce(0,+))) { result[i] += 1 }
         return result
     }
+    public func choose(excluding:Set<SpeciesID>,unit:Double = Double.random(in:0..<1)) -> SpeciesID? {
+        let candidates=entries.filter{$0.points>0 && !excluding.contains($0.id)}
+        let total=candidates.reduce(0){$0+$1.points}
+        guard total>0 else {return nil}
+        var ticket=Int(min(1-Double.ulpOfOne,max(0,unit.isFinite ? unit:0))*Double(total))
+        for entry in candidates {
+            if ticket<entry.points {return entry.id};ticket-=entry.points
+        }
+        return candidates.last?.id
+    }
     public func choose(unit:Double = Double.random(in:0..<1)) -> SpeciesID {
         var ticket = Int(min(1-Double.ulpOfOne,max(0,unit.isFinite ? unit : 0))*10_000)
         for entry in entries where entry.points > 0 {
@@ -82,6 +92,7 @@ public struct BirdSettings: Codable {
     public var catalog: SpeciesCatalog
     public var probabilities: ProbabilityDistribution
     public var pendingSpecies: [SpeciesID]? = nil
+    public var perchTimingVersion: Int? = 1
     public init(catalog:SpeciesCatalog = .standard) {
         self.catalog = catalog; probabilities = ProbabilityDistribution(catalog:catalog)
     }
@@ -94,6 +105,10 @@ public struct BirdSettings: Codable {
         let pending=Set(value.pendingSpecies ?? []).union(added.map(\.id))
         value.pendingSpecies=SpeciesCatalog.standard.species.map(\.id).filter{pending.contains($0)}
         value.catalog.species += added
+        if (value.perchTimingVersion ?? 0) < 1 {
+            value.catalog.migratePerchDefaults()
+            value.perchTimingVersion = 1
+        }
         try value.probabilities.includeNewSpecies()
         _ = try SpeciesCatalog.decode(JSONEncoder().encode(value.catalog))
         guard value.probabilities.isValid else { throw NSError(domain:"BirdSettings",code:1) }
@@ -113,6 +128,7 @@ public struct BirdSettings: Codable {
             let original=catalog
             let ids=Set(catalog.species.map(\.id))
             catalog.species += SpeciesCatalog.standard.species.filter{!ids.contains($0.id)}
+            catalog.migratePerchDefaults()
             var result=BirdSettings(catalog:try SpeciesCatalog.decode(JSONEncoder().encode(catalog)))
             result.probabilities=ProbabilityDistribution(catalog:original)
             try result.probabilities.includeNewSpecies()

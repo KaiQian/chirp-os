@@ -39,6 +39,7 @@ internal static class Native
     {
         WindowDiagnostics.Clear();
         var list = new List<Surface>(); uint own = (uint)Environment.ProcessId;
+        var focused=GetForegroundWindow();
         EnumWindows((h, _) =>
         {
             if (!IsWindowVisible(h) || IsIconic(h)) return true; GetWindowThreadProcessId(h, out var pid); if (pid == own) return true;
@@ -53,7 +54,7 @@ internal static class Native
             WindowDiagnostics.Add(new {id=(long)h, className=name,style,exStyle=ex,opacity,accepted,bounds=r.Box});
             if(!accepted)return true;
             bool top = (ex & 8) != 0;
-            list.Add(new((long)h, r.Box, top, !top && (ex & 0x80) == 0 && r.Box.W >= 180 && r.Box.H >= 100)); return true;
+            list.Add(new((long)h, r.Box, top, !top && (ex & 0x80) == 0 && r.Box.W >= 180 && r.Box.H >= 100,h==focused)); return true;
         }, 0); return list;
     }
     internal static double DpiScale(Screen screen) { var p = new Point(screen.Bounds.Left + 10, screen.Bounds.Top + 10); var m = MonitorFromPoint(p, 2); return GetDpiForMonitor(m, 0, out var x, out _) == 0 ? x / 96.0 : 1; }

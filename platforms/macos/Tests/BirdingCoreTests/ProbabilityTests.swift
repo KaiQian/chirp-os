@@ -2,6 +2,57 @@ import XCTest
 @testable import BirdingCore
 
 final class ProbabilityTests: XCTestCase {
+    func testCappedSpeciesAreExcludedWithoutChangingSavedWeightsOrEnablingDisabledSpecies() {
+        var p=ProbabilityDistribution(catalog:.standard)
+        p.adjust(at:0,to:10_000)
+        let original=p
+        XCTAssertEqual(p.choose(excluding:[],unit:0.999),p.entries[0].id)
+        XCTAssertNil(p.choose(excluding:[p.entries[0].id],unit:0))
+        XCTAssertEqual(p,original)
+        p.adjust(at:0,to:5000)
+        for unit in [0.0,0.5,0.999] {XCTAssertNotEqual(p.choose(excluding:[p.entries[0].id],unit:unit),p.entries[0].id)}
+    }
+    func testPerchUpgradePreservesCustomSettingsAndRunsOnce() throws {
+        var old=BirdSettings()
+        old.perchTimingVersion=nil
+        for i in old.catalog.species.indices {
+            old.catalog.species[i].perchMin /= 3
+            old.catalog.species[i].perchMax /= 3
+        }
+        old.catalog.species[0].speed=1.5
+        old.catalog.species[1].perchMin=11
+        old.catalog.species[2].perchMax=29
+        old.probabilities.setLocked(true,at:0)
+        var upgraded=try BirdSettings.decode(JSONEncoder().encode(old))
+        for i in old.catalog.species.indices where i != 1 && i != 2 {
+            XCTAssertEqual(upgraded.catalog.species[i].perchMin,SpeciesCatalog.standard.species[i].perchMin)
+            XCTAssertEqual(upgraded.catalog.species[i].perchMax,SpeciesCatalog.standard.species[i].perchMax)
+        }
+        XCTAssertEqual(upgraded.catalog.species[0].speed,1.5)
+        XCTAssertEqual(upgraded.catalog.species[1],old.catalog.species[1])
+        XCTAssertEqual(upgraded.catalog.species[2],old.catalog.species[2])
+        XCTAssertEqual(upgraded.probabilities,old.probabilities)
+        XCTAssertEqual(upgraded.perchTimingVersion,1)
+        // A later explicit choice of the former default pair must remain a custom choice.
+        upgraded.catalog.species[0].perchMin=14
+        upgraded.catalog.species[0].perchMax=28
+        let reloaded=try BirdSettings.decode(JSONEncoder().encode(upgraded))
+        XCTAssertEqual(reloaded.catalog.species,upgraded.catalog.species)
+    }
+    func testLegacyCatalogUpgradesPerchesWithoutResettingCustomRange() throws {
+        let dir=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at:dir,withIntermediateDirectories:true)
+        defer { try? FileManager.default.removeItem(at:dir) }
+        var catalog=SpeciesCatalog.standard
+        catalog.species[0].perchMin=14; catalog.species[0].perchMax=28
+        catalog.species[1].perchMin=9; catalog.species[1].perchMax=19
+        let legacy=dir.appendingPathComponent("species.json")
+        try JSONEncoder().encode(catalog).write(to:legacy)
+        let loaded=try BirdSettings.load(from:dir.appendingPathComponent("settings.json"),legacyURL:legacy)
+        XCTAssertEqual(loaded.catalog.species[0],SpeciesCatalog.standard.species[0])
+        XCTAssertEqual(loaded.catalog.species[1],catalog.species[1])
+        XCTAssertEqual(loaded.perchTimingVersion,1)
+    }
     func testDefaultsSumExactlyAndSampleZeroExcluded() {
         var d=ProbabilityDistribution(catalog:.standard)
         XCTAssertTrue(d.isValid)

@@ -31,6 +31,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification:Notification) {
         if let path = argument("--verify-birds") { ExpandedVerification.run(to:URL(fileURLWithPath:path)); return }
         if let path = argument("--verify-settings") { SettingsVerification.run(to:URL(fileURLWithPath:path)); return }
+        if let path = argument("--verify-app-headers") { AppHeaderVerification.run(to:URL(fileURLWithPath:path)); return }
+        if let path = argument("--verify-iterm-live") { InteriorVerification.live(to:URL(fileURLWithPath:path)); return }
+        if let path = argument("--verify-interior") { InteriorVerification.run(to:URL(fileURLWithPath:path),imagePath:argument("--interior-image")); return }
+        if let path = argument("--verify-perching") { PerchingVerification.run(to:URL(fileURLWithPath:path)); return }
         if let path = argument("--fixture") {
             fixture = FixtureController(folder:URL(fileURLWithPath:path)); fixture?.start()
         } else {

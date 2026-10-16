@@ -23,11 +23,12 @@
 
 - 多种小鸟，各有鲜明外形和习性动作，详见下方[鸟种列表](#鸟种--bird-species)。
 - 小鸟随窗口缓慢移动，快速拖动时可能受惊飞走；前方窗口会遮住后方停留的小鸟。
-- 鸟群随机飞入、飞出，可设置数量范围，例如 3–5、8–12 或 15–20 只。
+- 鸟群随机飞入、飞出，可设置数量范围，例如 3–5、8–12 或 15–20 只；同种最多两只，以同种一对群栖为主。
 - 自由调整每种鸟的出现概率并锁定；也可设置体长、振翅频率、飞速和停留时间。
 - 鼠标停在小鸟身上约 1 秒，头顶就会显示名字；点击仍会穿透。
 - 夜鹭会长时间守望、伸颈、抖毛，偶尔“挤洗手液”；大斑啄木鸟会沿窗口侧边停靠、啄击。
 - 菜单中的“鸟种测试”打开白底动画图鉴，网格展示全部鸟种与循环动作。
+- macOS 上可停在 iTerm2 标题栏和分屏栏、Chrome 地址栏与书签栏空白处、飞书侧栏和消息标题空白区，随布局移动并避开控件。
 - 支持中英文切换、暂停动画和随系统启动。
 
 ### 鸟种 / Bird species
@@ -90,9 +91,11 @@
 
 macOS 版本使用 Developer ID 签名并经过 Apple 公证。Windows 版本尚未使用发布者证书签名，首次打开可能遇到系统安全提示。
 
+如需应用内部停栖，在 macOS 菜单中点击“启用应用内部停栖…”，并在系统设置中允许啾啾使用辅助功能。已有权限时会自动识别，也可通过同一菜单关闭；顶部空间不足的位置不会提供落点，编辑 Chrome 地址栏时鸟会让开。同种两只上限优先于总数下限，仅启用一种鸟时最多显示两只。
+
 ### 隐私与反馈
 
-啾啾在本机运行，仅读取窗口位置、前后顺序和用于悬停识别的鼠标位置，不读取窗口标题或内容，也不上传数据。窗口遮挡按矩形估算，透明窗口、圆角和特殊系统界面的效果可能有所不同。
+啾啾在本机运行，不上传数据。常规停栖读取窗口位置、前后顺序和用于悬停识别的鼠标位置。应用内部停栖在获得权限后，还会读取栏位、控件及标题标签用于避让，并在内存中测量 Chrome 地址栏文字宽度；不遍历网页和聊天内容，不保存网址或消息。iTerm2 原生信息不可用时，macOS 14+ 可在已有屏幕录制权限下于内存中分析单窗口画面，不做 OCR，不保存终端画面或内容。窗口遮挡按矩形估算，透明窗口、圆角和特殊系统界面的效果可能有所不同。
 
 遇到问题或有新点子，欢迎提交 [Issue](https://github.com/billtt/chirp-os/issues)。想自己构建或贡献代码，请看[开发指南](docs/DEVELOPMENT.md)。
 
@@ -104,11 +107,12 @@ ChirpOS brings pixel-art birds to your macOS or Windows desktop. They fly in fro
 
 - Distinctive bird species, each with its own appearance and behavior. See the [Chinese–English species list](#鸟种--bird-species).
 - Birds follow gently moved windows and may startle when dragged quickly. Foreground windows hide birds perched behind them.
-- Birds arrive and leave at random, with configurable population ranges such as 3–5, 8–12, or 15–20.
+- Birds arrive and leave at random, with configurable population ranges such as 3–5, 8–12, or 15–20. Each species is limited to two birds, with social gatherings favoring conspecific pairs.
 - Adjust and lock arrival probabilities, and customize size, wingbeat rate, speed, and perch duration.
 - Hover over a bird for about 1 second to see its name, with clicks still passing through.
 - Night herons watch, stretch, shake and occasionally leave a fleeting dropping; woodpeckers cling to and peck window sides.
 - Open “Bird test” from the menu for a white-background grid of all species cycling through their animations.
+- Perch on blank iTerm2 title/pane bars, Chrome address/bookmark bars, and Feishu sidebar/message headers on macOS, following layout changes and avoiding controls.
 - Chinese and English menus, animation pause, and launch at login.
 
 ### Get started
@@ -123,9 +127,11 @@ When new species are detected at startup, choose default probabilities, allocati
 
 The macOS app is Developer ID-signed and notarized by Apple. Windows builds are not publisher-signed, so a system security prompt may appear on first launch.
 
+For interior app perches, select “Enable perching inside apps…” from the macOS menu and grant ChirpOS Accessibility access in System Settings. Discovery is automatic when permission already exists; the same menu can disable it. Positions without enough headroom remain unavailable, and birds leave the Chrome address bar while it is being edited. The two-per-species limit takes precedence over the population minimum; enabling only one species allows at most two birds.
+
 ### Privacy & feedback
 
-ChirpOS runs locally. It reads window geometry, stacking order and pointer position for hover identification, not window titles or content, and uploads no data. Occlusion uses rectangular bounds; transparent windows, rounded corners, and special system views may look different.
+ChirpOS runs locally and uploads no data. Ordinary perches use window geometry, stacking order and pointer position for hover identification. With permission, interior perches read bar/control geometry and header labels, and measure Chrome address text width in memory. Web pages and conversations are excluded from traversal; URLs and messages are not stored. When native iTerm2 metadata is unavailable, macOS 14+ can analyze an authorized window-only capture in memory; no OCR or terminal image/content storage. Occlusion uses rectangular bounds; transparent windows, rounded corners, and special system views may look different.
 
 Report a bug or suggest an idea in [Issues](https://github.com/billtt/chirp-os/issues). For building and contributing, see the [development guide](docs/DEVELOPMENT.md).
 
