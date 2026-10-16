@@ -62,12 +62,15 @@ enum PerchingVerification {
                 d.updateBirds(1)
                 checks["gatheringMovesFollowerWhileLeaderStays"]=leader.state == .perched && mate.state == .flying && mate.hostID==full.id
                 var focused=full;focused.isFocused=true;d.surfaces=[focused]
+                d.flock.prepareFocusReactions(residents:d.birds,surfaces:d.surfaces,random:{0.5})
                 for bird in d.birds {bird.updateHost(surfaces:d.surfaces,sampleDT:0.03)}
+                checks["focusWaitsForPerchedBirdButAvoidsIncomingImmediately"]=leader.state == .perched && leader.focusReactionDelay != nil && mate.state == .flying && mate.hostID==nil
+                for bird in d.birds {bird.tick(1.3)}
                 checks["focusEvictsBothPerchedAndIncomingBottomBirds"]=d.birds.allSatisfy{$0.state == .flying && $0.hostID==nil}
                 checks["focusedBottomCannotBeChosenAgain"] = !d.chooseDestination(leader)
             }
         }
-        let passed=checks.count==17 && checks.values.allSatisfy{$0}
+        let passed=checks.count==18 && checks.values.allSatisfy{$0}
         try? FileManager.default.createDirectory(at:folder,withIntermediateDirectories:true)
         saveJSON(["passed":passed,"checks":checks],to:folder.appendingPathComponent("report.json"))
         print("Perching controller: \(passed ? "PASS":"FAIL") — \(checks.count) checks")

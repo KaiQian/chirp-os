@@ -16,6 +16,17 @@ public enum FlockPhase { Independent, Gathering, Dispersing }
 // Social decisions share a simulation clock; each bird keeps its own animation clock.
 public sealed class FlockCoordinator(double initialDelay=60) {
     public const int MaximumPerSpecies=2;
+    public void PrepareFocusReactions(IReadOnlyList<Bird> residents,IReadOnlyList<Surface> surfaces,Func<double> random) {
+        foreach(var host in surfaces.Where(s=>s.IsFocused)) {
+            var waiting=residents.Where(b=>b.Host==host.Id && b.Edge==PerchEdge.Bottom && b.State!=BirdState.Flying && !b.Departing).ToArray();
+            var delay=waiting.Select(b=>b.FocusReactionDelay??0).DefaultIfEmpty(0).Max();
+            // Randomize who notices first, then reserve distinct takeoff times.
+            foreach(var bird in waiting.Where(b=>b.FocusReactionDelay==null).OrderBy(_=>random()).ToArray()) {
+                var unit=Math.Clamp(random(),0,1);delay+=.18+.32*unit+(unit>.85?.7:0);
+                bird.ScheduleFocusReaction(delay);
+            }
+        }
+    }
     public static bool CanAdmit(string id,IReadOnlyList<Bird> residents)=>residents.Count(b=>b.Species.Id==id)<MaximumPerSpecies;
     public void CancelCompanion(){companion=null;}
     public FlockPhase Phase {get;private set;}=FlockPhase.Independent;

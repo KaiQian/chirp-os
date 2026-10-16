@@ -35,7 +35,7 @@ final class FixtureController {
     func tick() {
         if let command = try? String(contentsOf:folder.appendingPathComponent("command"),encoding:.utf8), command != previousCommand {
             previousCommand = command
-            switch command {
+            switch command.components(separatedBy:"\n")[0] {
             case "slow": slowRemaining = 30
             case "cover":
                 cover.setFrameOrigin(CGPoint(x:host.frame.midX+4,y:host.frame.maxY-100)); cover.orderFrontRegardless()
@@ -75,7 +75,7 @@ final class IntegrationCheck {
     var bird: Bird { desktop.birds[0] }
     init(desktop: DesktopController, folder:URL) { self.desktop = desktop; self.folder = folder }
     func after(_ seconds: Double,_ action: @escaping () -> Void) { DispatchQueue.main.asyncAfter(deadline:.now()+seconds,execute:action) }
-    func command(_ value:String) { try? value.write(to:folder.appendingPathComponent("command"),atomically:true,encoding:.utf8) }
+    func command(_ value:String) { try? (value+"\n"+UUID().uuidString).write(to:folder.appendingPathComponent("command"),atomically:true,encoding:.utf8) }
     func host() -> Surface? { desktop.surfaces.first{$0.id == hostID} }
     func start() {
         guard let data = try? Data(contentsOf:folder.appendingPathComponent("fixture.json")),
@@ -148,6 +148,9 @@ final class IntegrationCheck {
             self.saveLayerSnapshot()
             self.command("native-fullscreen")
         }
+        // Entering a native fullscreen Space can change focus during its animation.
+        // Explicitly focus the fixture after that transition has settled.
+        after(10.8) { self.command("focus-host") }
         after(11.4) {
             self.recordScene("fullscreen")
             guard let host=self.host(),let screen=self.desktop.screenRects.first(where:{$0.contains(CGPoint(x:host.rect.midX,y:host.rect.midY))}) else {self.finish(error:"fullscreen fixture missing");return}
@@ -178,7 +181,7 @@ final class IntegrationCheck {
             self.focusWindow?.orderOut(nil)
             self.command("focus-host")
         }
-        after(14.6) {
+        after(15.2) {
             self.results["focusingNativeFullscreenEvictsBottomBird"]=self.host()?.isFocused==true && self.bird.state == .flying && self.bird.hostID != self.hostID
             self.command("native-windowed")
         }

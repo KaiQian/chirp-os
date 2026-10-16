@@ -153,6 +153,7 @@ public final class Bird {
     public var groupID: UUID?
     public var leadsGroup = false
     public private(set) var socialMoveDelay: Double?
+    public private(set) var focusReactionDelay: Double?
     private var socialMoveRequested = false
     public let profile: SpeciesProfile
     public var position: CGPoint
@@ -186,6 +187,7 @@ public final class Bird {
         previousHost = nil; flightDuration = max(0.3, duration) / (Self.flightSpeedMultiplier * profile.speed); self.arc = arc
         flightAge = 0; stateTime = 0; state = .flying; destinationInvalidated = false
         socialMoveRequested = false; socialMoveDelay = nil
+        focusReactionDelay = nil
     }
     public func depart(to point: CGPoint, duration: Double) {
         fly(to: point, host: nil, duration: duration, arc: 30)
@@ -197,14 +199,20 @@ public final class Bird {
         position = Geometry.foot(on:host,fraction:fraction,edge:edge,scale:spriteScale,screen:bottomViewport,railID:railID)
         state = .perched; stateTime = 0; searchTime = 0; destinationInvalidated = false
         socialMoveRequested = false; socialMoveDelay = nil
+        focusReactionDelay = nil
         if edge.isSide { facingRight = edge == .left }
     }
     public func invalidateDestination() {
+        focusReactionDelay = nil
         hostID = nil; depthID = nil; previousHost = nil
         if state != .flying { state = .flying; stateTime = 0 }
         destinationInvalidated = true
     }
     public func scheduleSocialMove(after delay:Double) { socialMoveRequested=false; socialMoveDelay = max(0,delay) }
+    public func scheduleFocusReaction(after delay:Double) {
+        guard focusReactionDelay == nil, state != .flying, !isDeparting else {return}
+        focusReactionDelay=max(0,delay)
+    }
     public func flee() {
         startledCount += 1
         fly(to: CGPoint(x: position.x + (facingRight ? 210 : -210), y: position.y - 100), host: nil, duration: 1.25, arc: 45)
@@ -213,13 +221,18 @@ public final class Bird {
     public func updateHost(surfaces: [Surface], sampleDT: Double, spriteScale: CGFloat = 1) {
         guard let id = hostID else { return }
         guard let host = surfaces.first(where: { $0.id == id }) else { flee(); return }
+        if edge != .bottom || !host.isFocused {focusReactionDelay=nil}
         if edge == .rail {
             guard host.rails.contains(where:{$0.id==railID}) else {flee();return}
         }
         if edge == .bottom {
-            if host.isFocused {flee();return}
+            if host.isFocused {
+                if state == .flying {flee();return}
+                scheduleFocusReaction(after:Double.random(in:0.18...1.2))
+            }
+            var eligibleHost=host;eligibleHost.isFocused=false
             guard let viewport=bottomViewport,
-                  Geometry.isBottomHost(host,surfaces:surfaces,screen:viewport,scale:spriteScale) else { invalidateDestination(); return }
+                  Geometry.isBottomHost(eligibleHost,surfaces:surfaces,screen:viewport,scale:spriteScale) else { invalidateDestination(); return }
         }
         let point = Geometry.foot(on:host,fraction:fraction,edge:edge,scale:spriteScale,screen:bottomViewport,railID:railID)
         if (state == .flying || edge == .rail) && !Geometry.isLandingVisible(on: id, at: point, surfaces: surfaces, scale: spriteScale, edge: edge) {
@@ -243,7 +256,11 @@ public final class Bird {
     }
     public func tick(_ dt: Double) {
         if !isDeparting { visitAge+=max(0,dt) }
-        if state == .perched, let delay=socialMoveDelay {
+        if let delay=focusReactionDelay {
+            focusReactionDelay=max(0,delay-max(0,dt))
+            if focusReactionDelay == 0 {flee();return}
+        }
+        if focusReactionDelay == nil, state == .perched, let delay=socialMoveDelay {
             socialMoveDelay=max(0,delay-max(0,dt))
             if socialMoveDelay == 0 { socialMoveDelay=nil; socialMoveRequested=true }
         }
@@ -270,7 +287,7 @@ public final class Bird {
         }
     }
     public var needsDestination: Bool {
-        !isDeparting && (socialMoveRequested || destinationInvalidated || (state == .flying && flightAge >= flightDuration && hostID == nil) ||
+        !isDeparting && focusReactionDelay == nil && (socialMoveRequested || destinationInvalidated || (state == .flying && flightAge >= flightDuration && hostID == nil) ||
         (state == .perched && stateTime >= perchDuration))
     }
     public func blockers(in surfaces: [Surface]) -> [CGRect] {

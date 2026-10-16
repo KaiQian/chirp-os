@@ -106,7 +106,30 @@ Check(bottomBird.State==BirdState.Perched && Math.Abs(bottomBird.Position.Y-(bot
 var normalWindow=fullWindow with{Rect=new(-1820,-980,1720,880)};var beforeRestore=bottomBird.Position;bottomBird.UpdateHost(new[]{normalWindow},.033,1);
 Check(bottomBird.NeedsDestination && bottomBird.Position==beforeRestore && bottomBird.Host==null && bottomBird.Startles==0,"restoring window invalidates bottom perch without teleporting");
 var focusedFull=fullWindow with{IsFocused=true};var focusBird=new Bird(s,new(0,0),rng){Edge=PerchEdge.Bottom,BottomViewport=fullScreen};focusBird.Perch(fullWindow);var focusPosition=focusBird.Position;focusBird.UpdateHost(new[]{focusedFull},.033,1);
+Check(focusBird.State==BirdState.Perched && focusBird.FocusReactionDelay!=null,"focus gives a perched bird reaction time");focusBird.Tick(1.3);
 Check(focusBird.State==BirdState.Flying && focusBird.Host==null && focusBird.Position==focusPosition && focusBird.Startles==1,"focus startles a bottom bird without teleporting");
+var reactionBirds=Enumerable.Range(0,3).Select(i=>{var bird=new Bird(s,new(0,0),rng){Edge=PerchEdge.Bottom,BottomViewport=fullScreen,Fraction=(i+1)/4.0};bird.Perch(fullWindow);bird.ScheduleSocialMove(0);return bird;}).ToArray();
+var reactionFlock=new FlockCoordinator();var reactionUnits=new Queue<double>(new[]{.1,.2,.3,0,.5,.95});
+reactionFlock.PrepareFocusReactions(reactionBirds,new[]{focusedFull},()=>reactionUnits.Dequeue());
+Check(Math.Abs(reactionBirds[0].FocusReactionDelay!.Value-.18)<.001 && Math.Abs(reactionBirds[1].FocusReactionDelay!.Value-.52)<.001 && reactionBirds[2].FocusReactionDelay-reactionBirds[1].FocusReactionDelay>1,"focus reserves staggered reactions including an occasional slow bird");
+foreach(var reactingBird in reactionBirds){reactingBird.UpdateHost(new[]{focusedFull},.033,1);reactingBird.Tick(.2);}
+Check(reactionBirds[0].State==BirdState.Flying && reactionBirds[1].State==BirdState.Perched && reactionBirds[2].State==BirdState.Perched && !reactionBirds[1].NeedsDestination,"first bird takes off while others wait without social moves bypassing delay");
+var pendingReaction=reactionBirds[1].FocusReactionDelay;reactionFlock.PrepareFocusReactions(reactionBirds,new[]{focusedFull},()=>0);reactionBirds[1].UpdateHost(new[]{focusedFull},.033,1);
+Check(reactionBirds[1].FocusReactionDelay==pendingReaction,"metadata sampling never resets focus countdown");
+foreach(var reactingBird in reactionBirds)reactingBird.Tick(.4);
+Check(reactionBirds[1].State==BirdState.Flying && reactionBirds[2].State==BirdState.Perched,"second bird takes off before the slow bird");reactionBirds[2].Tick(2);
+Check(reactionBirds.All(b=>b.Startles==1 && b.Host==null && b.FocusReactionDelay==null),"each delayed focus reaction fires once and clears");
+focusBird.Perch(fullWindow);focusBird.ScheduleFocusReaction(2);focusBird.UpdateHost(new[]{focusedFull},.033,1);focusBird.Tick(.1);focusBird.UpdateHost(new[]{fullWindow},.033,1);focusBird.Tick(3);
+Check(focusBird.State==BirdState.Perched && focusBird.FocusReactionDelay==null && focusBird.Startles==1,"blur cancels pending focus reaction");
+focusBird.UpdateHost(new[]{focusedFull},.033,1);focusBird.UpdateHost([], .033,1);
+Check(focusBird.State==BirdState.Flying && focusBird.FocusReactionDelay==null && focusBird.Startles==2,"missing host bypasses focus reaction delay");
+focusBird.Perch(fullWindow);focusBird.ScheduleFocusReaction(2);focusBird.UpdateHost(new[]{focusedFull with{Rect=new(fullScreen.X,fullScreen.Y-40,fullScreen.W,fullScreen.H+40)}},.033,1);
+Check(focusBird.State==BirdState.Flying && focusBird.FocusReactionDelay==null && focusBird.Startles==3,"fast host motion bypasses focus reaction delay");
+var incomingFocusBird=new Bird(s,new(0,0),rng){Edge=PerchEdge.Bottom,BottomViewport=fullScreen};incomingFocusBird.Fly(Geometry.Foot(fullWindow,.5,PerchEdge.Bottom,1,fullScreen),fullWindow);incomingFocusBird.UpdateHost(new[]{focusedFull},.033,1);
+Check(incomingFocusBird.Host==null && incomingFocusBird.FocusReactionDelay==null && incomingFocusBird.Startles==1,"incoming bottom bird immediately avoids focused window");
+incomingFocusBird.Fly(Geometry.Foot(fullWindow,.5,PerchEdge.Bottom,1,fullScreen),fullWindow,1);incomingFocusBird.Tick(.5);reactionFlock.PrepareFocusReactions(new[]{incomingFocusBird},new[]{focusedFull},()=>0);incomingFocusBird.UpdateHost(new[]{focusedFull},.033,1);incomingFocusBird.Tick(.1);
+Check(incomingFocusBird.State==BirdState.Landing && incomingFocusBird.FocusReactionDelay!=null,"bird already touching down receives focus reaction time");incomingFocusBird.Tick(.1);
+Check(incomingFocusBird.State==BirdState.Flying && incomingFocusBird.Startles==2,"touchdown reaction eventually takes off");
 Check(Geometry.BottomRanges(focusedFull,new[]{focusedFull},fullScreen,1,[]).Count==0 && Geometry.BottomRanges(rearFull,new[]{focusedFull,rearFull},fullScreen,1,[]).Count==0,"focused fullscreen does not admit bottom birds or hidden background replacements");
 Check(Geometry.LandingRanges(normalWindow with{IsFocused=true},new[]{normalWindow with{IsFocused=true}},fullScreen,1,[]).Count>0,"focused ordinary windows retain top perches");
 

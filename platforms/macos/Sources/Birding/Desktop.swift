@@ -216,6 +216,7 @@ final class DesktopController: NSObject {
         }
         interiorPerches.refresh(surfaces:surfaces,enabled:interiorPerchesEnabled)
         for index in surfaces.indices {surfaces[index].rails=interiorPerches.rails(for:surfaces[index])}
+        flock.prepareFocusReactions(residents:birds,surfaces:surfaces)
         for bird in birds {
             if bird.edge == .bottom, let old=bird.bottomViewport {
                 bird.bottomViewport=NSScreen.screens.first { Geometry.quartz($0.frame,primaryHeight:primaryHeight).contains(CGPoint(x:old.midX,y:old.midY)) }

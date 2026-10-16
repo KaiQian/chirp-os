@@ -88,6 +88,8 @@ final class BottomPerchTests:XCTestCase {
         let bird=Bird(position:.zero,fraction:0.5);bird.edge = .bottom;bird.bottomViewport=screen;bird.perch(on:host)
         let point=bird.position
         bird.updateHost(surfaces:[focused],sampleDT:0.03)
+        XCTAssertEqual(bird.state,.perched);XCTAssertNotNil(bird.focusReactionDelay)
+        bird.tick(1.3)
         XCTAssertEqual(bird.position,point);XCTAssertEqual(bird.state,.flying)
         XCTAssertNil(bird.hostID);XCTAssertEqual(bird.startledCount,1)
         XCTAssertTrue(Geometry.bottomRanges(on:focused,surfaces:[focused],screen:screen,scale:1).isEmpty)
@@ -95,6 +97,68 @@ final class BottomPerchTests:XCTestCase {
         XCTAssertTrue(Geometry.bottomRanges(on:rear,surfaces:[focused,rear],screen:screen,scale:1).isEmpty)
         let normal=Surface(id:3,rect:screen.insetBy(dx:100,dy:100),isFocused:true)
         XCTAssertFalse(Geometry.landingRanges(on:normal,surfaces:[normal],screen:screen,scale:1).isEmpty)
+    }
+    func testFocusReactionsStaggerAndSamplingDoesNotRestartCountdown() {
+        let host=Surface(id:1,rect:screen),focused=Surface(id:1,rect:screen,isFocused:true)
+        let birds=(0..<3).map { i -> Bird in
+            let bird=Bird(position:.zero,fraction:CGFloat(i+1)/4)
+            bird.edge = .bottom;bird.bottomViewport=screen;bird.perch(on:host);bird.perchDuration=0
+            bird.scheduleSocialMove(after:0)
+            return bird
+        }
+        let flock=FlockCoordinator()
+        var units=[0.1,0.2,0.3,0.0,0.5,0.95].makeIterator()
+        flock.prepareFocusReactions(residents:birds,surfaces:[focused],random:{units.next()!})
+        let delays=birds.map{$0.focusReactionDelay!}
+        XCTAssertEqual(delays[0],0.18,accuracy:0.001)
+        XCTAssertEqual(delays[1],0.52,accuracy:0.001)
+        XCTAssertGreaterThan(delays[2]-delays[1],1)
+        for bird in birds {bird.updateHost(surfaces:[focused],sampleDT:0.03);bird.tick(0.2)}
+        XCTAssertEqual(birds.map(\.state),[.flying,.perched,.perched])
+        XCTAssertFalse(birds[1].needsDestination) // Natural/social clocks cannot bypass the reaction.
+        let remaining=birds[1].focusReactionDelay
+        flock.prepareFocusReactions(residents:birds,surfaces:[focused],random:{0})
+        birds[1].updateHost(surfaces:[focused],sampleDT:0.03)
+        XCTAssertEqual(birds[1].focusReactionDelay,remaining)
+        for bird in birds {bird.tick(0.4)}
+        XCTAssertEqual(birds.map(\.state),[.flying,.flying,.perched])
+        birds[2].tick(2)
+        XCTAssertEqual(birds.map(\.startledCount),[1,1,1])
+        XCTAssertTrue(birds.allSatisfy{$0.hostID==nil && $0.focusReactionDelay==nil})
+    }
+    func testBlurCancelsFocusReactionAndMissingOrFastMovingHostStillStartlesImmediately() {
+        let host=Surface(id:1,rect:screen),focused=Surface(id:1,rect:screen,isFocused:true)
+        let bird=Bird(position:.zero,fraction:0.5);bird.edge = .bottom;bird.bottomViewport=screen;bird.perch(on:host)
+        bird.scheduleFocusReaction(after:2);bird.updateHost(surfaces:[focused],sampleDT:0.03)
+        bird.tick(0.1);bird.updateHost(surfaces:[host],sampleDT:0.03);bird.tick(3)
+        XCTAssertEqual(bird.state,.perched);XCTAssertNil(bird.focusReactionDelay);XCTAssertEqual(bird.startledCount,0)
+        bird.updateHost(surfaces:[focused],sampleDT:0.03);bird.updateHost(surfaces:[],sampleDT:0.03)
+        XCTAssertEqual(bird.state,.flying);XCTAssertNil(bird.focusReactionDelay);XCTAssertEqual(bird.startledCount,1)
+        bird.perch(on:host);bird.scheduleFocusReaction(after:2)
+        let moved=Surface(id:1,rect:CGRect(x:screen.minX,y:screen.minY-40,width:screen.width,height:screen.height+40),isFocused:true)
+        bird.updateHost(surfaces:[moved],sampleDT:0.03)
+        XCTAssertEqual(bird.state,.flying);XCTAssertNil(bird.focusReactionDelay)
+        XCTAssertEqual(bird.startledCount,2)
+    }
+    func testFocusImmediatelyRejectsIncomingBottomBirdButLeavesOtherEdgesAlone() {
+        let focused=Surface(id:1,rect:screen,isFocused:true)
+        let incoming=Bird(position:.zero,fraction:0.5);incoming.edge = .bottom;incoming.bottomViewport=screen
+        incoming.fly(to:Geometry.foot(on:focused,fraction:0.5,edge:.bottom,screen:screen),host:focused)
+        incoming.updateHost(surfaces:[focused],sampleDT:0.03)
+        XCTAssertNil(incoming.hostID);XCTAssertNil(incoming.focusReactionDelay);XCTAssertEqual(incoming.startledCount,1)
+        let top=Bird(position:.zero,fraction:0.5);top.perch(on:focused)
+        FlockCoordinator().prepareFocusReactions(residents:[incoming,top],surfaces:[focused],random:{0})
+        top.updateHost(surfaces:[focused],sampleDT:0.03);top.tick(2)
+        XCTAssertEqual(top.state,.perched);XCTAssertNil(top.focusReactionDelay);XCTAssertEqual(top.startledCount,0)
+        let landing=Bird(position:.zero,fraction:0.5);landing.edge = .bottom;landing.bottomViewport=screen
+        landing.fly(to:Geometry.foot(on:focused,fraction:0.5,edge:.bottom,screen:screen),host:focused,duration:1)
+        landing.tick(landing.flightDuration)
+        XCTAssertEqual(landing.state,.landing)
+        FlockCoordinator().prepareFocusReactions(residents:[landing],surfaces:[focused],random:{0})
+        landing.updateHost(surfaces:[focused],sampleDT:0.03);landing.tick(0.1)
+        XCTAssertEqual(landing.state,.landing);XCTAssertNotNil(landing.focusReactionDelay)
+        landing.tick(0.1)
+        XCTAssertEqual(landing.state,.flying);XCTAssertEqual(landing.startledCount,1)
     }
     func testFocusedWindowSelectionDoesNotExcludeAllWindowsOfSameApp() {
         let other=Surface(id:1,pid:7,rect:screen)

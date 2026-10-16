@@ -119,7 +119,7 @@ internal sealed class Desktop : ApplicationContext
         var now = clock.Elapsed.TotalSeconds; var elapsed = now - last; last = now; var dt = Math.Clamp(elapsed, 0, .05);
         if (!Native.DesktopAvailable()) { foreach (var x in flock) x.View.Hide(); nameLabel.Hide(); hover.Update(null,now); return; }
         metadataAge += elapsed;
-        if (metadataAge >= 1.0 / 30) { surfaces = Native.Windows(); foreach (var (b, _) in flock) {
+        if (metadataAge >= 1.0 / 30) { surfaces = Native.Windows(); social.PrepareFocusReactions(flock.Select(x=>x.Bird).ToArray(),surfaces,rng.NextDouble); foreach (var (b, _) in flock) {
             if(b.Edge==PerchEdge.Bottom && b.BottomViewport is Box old) {
                 var screen=Screen.AllScreens.FirstOrDefault(s=>Bounds(s).Contains(new(old.X+old.W/2,old.Y+old.H/2,1,1)));
                 b.BottomViewport=screen is null?null:new Box(screen.WorkingArea.X,screen.WorkingArea.Y,screen.WorkingArea.Width,screen.WorkingArea.Height);

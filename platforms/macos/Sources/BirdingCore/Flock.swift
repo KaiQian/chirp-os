@@ -28,6 +28,19 @@ public enum FlockPhase { case independent, gathering, dispersing }
 // Pair requests are consumed only after admission, so unavailable perches cannot spawn bursts.
 public final class FlockCoordinator {
     public static let maximumPerSpecies=2
+    public func prepareFocusReactions(residents:[Bird],surfaces:[Surface],random:()->Double = {Double.random(in:0..<1)}) {
+        for host in surfaces where host.isFocused {
+            let waiting=residents.filter{$0.hostID==host.id && $0.edge == .bottom && $0.state != .flying && !$0.isDeparting}
+            var delay=waiting.compactMap(\.focusReactionDelay).max() ?? 0
+            // Randomize who notices first, then reserve distinct takeoff times.
+            let newcomers=waiting.filter{$0.focusReactionDelay==nil}.map{($0,random())}.sorted{$0.1<$1.1}
+            for (bird,_) in newcomers {
+                let unit=max(0,min(1,random()))
+                delay += 0.18+0.32*unit+(unit>0.85 ? 0.7:0)
+                bird.scheduleFocusReaction(after:delay)
+            }
+        }
+    }
     public static func canAdmit(_ id:SpeciesID,residents:[Bird])->Bool {
         // Departing sprites count until they have actually left the desktop.
         residents.filter{$0.profile.id==id}.count<maximumPerSpecies

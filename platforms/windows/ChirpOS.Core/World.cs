@@ -90,6 +90,7 @@ public sealed class Bird(Species species,V position,Random rng) {
     public Guid? GroupId {get;set;}
     public bool LeadsGroup {get;set;}
     public double? SocialMoveDelay {get;private set;}
+    public double? FocusReactionDelay {get;private set;}
     bool socialMoveRequested;
     public Species Species {get;}=species;
     public V Position {get;private set;}=position;
@@ -102,22 +103,24 @@ public sealed class Bird(Species species,V position,Random rng) {
     public int Landings {get;private set;} public int Startles {get;private set;}
     public double Followed {get;private set;}
     V origin=position,target=position; Box? previous; double flightAge,duration=1,arc=90; bool invalid;
-    public bool NeedsDestination=>!Departing && (socialMoveRequested || invalid || (State==BirdState.Flying && flightAge>=duration && Host==null) || (State==BirdState.Perched && Age>=PerchDuration));
+    public bool NeedsDestination=>!Departing && FocusReactionDelay==null && (socialMoveRequested || invalid || (State==BirdState.Flying && flightAge>=duration && Host==null) || (State==BirdState.Perched && Age>=PerchDuration));
     public bool DepartureFinished=>Departing && flightAge>=duration;
     public void Fly(V point,Surface? host,double seconds=3,double height=90,bool departing=false) {
         origin=Position;target=point;Host=host?.Id;Depth=null;previous=null;
         duration=Math.Max(.3,seconds)/(2*Species.Speed);arc=height;flightAge=0;Age=0;State=BirdState.Flying;invalid=false;Departing=departing;
-        socialMoveRequested=false;SocialMoveDelay=null;
+        socialMoveRequested=false;SocialMoveDelay=null;FocusReactionDelay=null;
     }
     public void Flee(){Startles++;Fly(new(Position.X+(Right?210:-210),Position.Y-100),null,1.25,45);}
-    public void Perch(Surface s,double scale=1){Host=Depth=s.Id;previous=s.Rect;Position=Geometry.Foot(s,Fraction,Edge,scale,BottomViewport);State=BirdState.Perched;Age=0;SearchAge=0;invalid=false;socialMoveRequested=false;SocialMoveDelay=null;if(IsSide)Right=Edge==PerchEdge.Left;}
-    public void InvalidateDestination(){Host=Depth=null;previous=null;if(State!=BirdState.Flying){State=BirdState.Flying;Age=0;}invalid=true;}
+    public void Perch(Surface s,double scale=1){Host=Depth=s.Id;previous=s.Rect;Position=Geometry.Foot(s,Fraction,Edge,scale,BottomViewport);State=BirdState.Perched;Age=0;SearchAge=0;invalid=false;socialMoveRequested=false;SocialMoveDelay=null;FocusReactionDelay=null;if(IsSide)Right=Edge==PerchEdge.Left;}
+    public void InvalidateDestination(){FocusReactionDelay=null;Host=Depth=null;previous=null;if(State!=BirdState.Flying){State=BirdState.Flying;Age=0;}invalid=true;}
     public void ScheduleSocialMove(double delay){socialMoveRequested=false;SocialMoveDelay=Math.Max(0,delay);}
+    public void ScheduleFocusReaction(double delay){if(FocusReactionDelay==null && State!=BirdState.Flying && !Departing)FocusReactionDelay=Math.Max(0,delay);}
     public void UpdateHost(IReadOnlyList<Surface> surfaces,double dt,double scale) {
         if(Host==null)return;var host=surfaces.FirstOrDefault(s=>s.Id==Host);
         if(host==null){Flee();return;}
-        if(Edge==PerchEdge.Bottom && host.IsFocused){Flee();return;}
-        if(Edge==PerchEdge.Bottom && (BottomViewport is not Box viewport || !Geometry.IsBottomHost(host,surfaces,viewport,scale))){InvalidateDestination();return;}
+        if(Edge!=PerchEdge.Bottom || !host.IsFocused)FocusReactionDelay=null;
+        if(Edge==PerchEdge.Bottom && host.IsFocused){if(State==BirdState.Flying){Flee();return;}ScheduleFocusReaction(.18+rng.NextDouble()*1.02);}
+        if(Edge==PerchEdge.Bottom && (BottomViewport is not Box viewport || !Geometry.IsBottomHost(host with{IsFocused=false},surfaces,viewport,scale))){InvalidateDestination();return;}
         var point=Geometry.Foot(host,Fraction,Edge,scale,BottomViewport);
         if(State==BirdState.Flying && !Geometry.Visible(host.Id,point,surfaces,scale,Edge)) {InvalidateDestination();return;}
         if(State!=BirdState.Flying){if(previous is Box old){var delta=V.Distance(new(old.X,old.Y),new(host.Rect.X,host.Rect.Y));if(dt<.2 && delta>8 && delta/Math.Max(.016,dt)>950){Flee();return;}Followed+=V.Distance(Position,point);}Position=point;}else target=point;
@@ -125,7 +128,8 @@ public sealed class Bird(Species species,V position,Random rng) {
     }
     public void Tick(double dt) {
         if(!Departing)VisitAge+=Math.Max(0,dt);
-        if(State==BirdState.Perched && SocialMoveDelay is double delay){SocialMoveDelay=Math.Max(0,delay-Math.Max(0,dt));if(SocialMoveDelay==0){SocialMoveDelay=null;socialMoveRequested=true;}}
+        if(FocusReactionDelay is double reaction){FocusReactionDelay=Math.Max(0,reaction-Math.Max(0,dt));if(FocusReactionDelay==0){Flee();return;}}
+        if(FocusReactionDelay==null && State==BirdState.Perched && SocialMoveDelay is double delay){SocialMoveDelay=Math.Max(0,delay-Math.Max(0,dt));if(SocialMoveDelay==0){SocialMoveDelay=null;socialMoveRequested=true;}}
         // Reroutes and blocked targets share one flight-search budget.
         if(State==BirdState.Flying && !Departing)SearchAge+=Math.Max(0,dt);
         if(invalid)return;Age+=dt;
